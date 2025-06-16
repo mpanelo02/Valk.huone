@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sensor Data</title>
+</head>
+<body>
+  <script>
+    async function getData() {
+      try {
+        const response = await fetch("http://localhost:3000/api/data");
+        const data = await response.json();
+        console.log(data);
+      } catch (err) {
+        console.error("Fetch error:", err);
+      }
+    }
+
+    getData();
+
+  </script>
+</body>
+</html>
