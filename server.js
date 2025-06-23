@@ -2,68 +2,22 @@ import express from 'express';
 import fetch from 'node-fetch';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { createObjectCsvWriter } from 'csv-writer';
+import admin from 'firebase-admin';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.ARANET_API_KEY;
 
-// Get directory name for ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Initialize Firebase Admin
+const serviceAccount = JSON.parse(fs.readFileSync('/etc/secrets/firebase-key.json')); // path from Render secret file
 
-// Directory for CSV files
-const dataDir = path.join(__dirname, 'sensor_data');
-if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir);
-}
-
-// CSV file paths
-const csvFiles = {
-    temperature: path.join(dataDir, 'temperature.csv'),
-    humidity: path.join(dataDir, 'humidity.csv'),
-    co2: path.join(dataDir, 'co2.csv'),
-    pressure: path.join(dataDir, 'pressure.csv'),
-    moisture: path.join(dataDir, 'moisture.csv'),
-    soilEC: path.join(dataDir, 'soilEC.csv')
-};
-
-// Initialize CSV files with headers if they don't exist
-function initCSVFile(filePath, header) {
-    if (!fs.existsSync(filePath)) {
-        fs.writeFileSync(filePath, header);
-    }
-}
-
-// Initialize all CSV files
-initCSVFile(csvFiles.temperature, 'Timestamp,Value (°C)\n');
-initCSVFile(csvFiles.humidity, 'Timestamp,Value (%)\n');
-initCSVFile(csvFiles.co2, 'Timestamp,Value (ppm)\n');
-initCSVFile(csvFiles.pressure, 'Timestamp,Value (hPa)\n');
-initCSVFile(csvFiles.moisture, 'Timestamp,Value (%)\n');
-initCSVFile(csvFiles.soilEC, 'Timestamp,Value (mS/cm)\n');
-
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  next();
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+  storageBucket: 'your-project-id.appspot.com', // replace with your bucket
 });
 
-// Helper function to append data to a specific CSV file
-function appendDataToCSV(filePath, timestamp, value) {
-    if (value === undefined || value === null) return;
-    
-    const csvRow = `${timestamp},${value}\n`;
-    
-    fs.appendFile(filePath, csvRow, (err) => {
-        if (err) {
-            console.error(`Error writing to ${filePath}:`, err);
-        } else {
-            console.log(`Data logged to ${path.basename(filePath)}: ${value}`);
-        }
-    });
-}
+const bucket = admin.storage().bucket();
 
 app.get('/api/data', async (req, res) => {
   try {
@@ -86,31 +40,53 @@ app.get('/api/data', async (req, res) => {
     const data1 = await response1.json();
     const data2 = await response2.json();
     const data3 = await response3.json();
-    
-    // Extract the values
-    const timestamp = new Date().toISOString();
-    const temperature = data1.readings?.find(r => r.metric === "1")?.value;
-    const humidity = data1.readings?.find(r => r.metric === "2")?.value;
-    const co2 = data3.readings?.find(r => r.metric === "3")?.value;
-    const pressure = data3.readings?.find(r => r.metric === "4")?.value;
-    const moisture = data2.readings?.find(r => r.metric === "8")?.value;
-    const soilEC = data2.readings?.find(r => r.metric === "10")?.value;
-    
-    // Log each value to its own CSV file
-    appendDataToCSV(csvFiles.temperature, timestamp, temperature);
-    appendDataToCSV(csvFiles.humidity, timestamp, humidity);
-    appendDataToCSV(csvFiles.co2, timestamp, co2);
-    appendDataToCSV(csvFiles.pressure, timestamp, pressure);
-    appendDataToCSV(csvFiles.moisture, timestamp, moisture);
-    appendDataToCSV(csvFiles.soilEC, timestamp, soilEC);
 
-    res.json({ sensor1: data1, sensor2: data2, sensor3: data3 });
+    const record = {
+      timestamp: new Date().toISOString(),
+      temperature: data1.data.find(d => d.parameter === 'temperature')?.value,
+      humidity: data1.data.find(d => d.parameter === 'humidity')?.value,
+      co2: data1.data.find(d => d.parameter === 'co2')?.value,
+      pressure: data2.data.find(d => d.parameter === 'pressure')?.value,
+      moisture: data3.data.find(d => d.parameter === 'moisture')?.value,
+      soilEC: data3.data.find(d => d.parameter === 'electricalConductivity')?.value,
+    };
+
+    const filePath = `/tmp/data-${Date.now()}.csv`;
+    const csvWriter = createObjectCsvWriter({
+      path: filePath,
+      header: [
+        { id: 'timestamp', title: 'Timestamp' },
+        { id: 'temperature', title: 'Temperature' },
+        { id: 'humidity', title: 'Humidity' },
+        { id: 'co2', title: 'CO2' },
+        { id: 'pressure', title: 'Pressure' },
+        { id: 'moisture', title: 'Moisture' },
+        { id: 'soilEC', title: 'SoilEC' },
+      ]
+    });
+
+    await csvWriter.writeRecords([record]);
+
+    // Upload to Firebase Storage
+    const uploadResponse = await bucket.upload(filePath, {
+      destination: `sensor-data/${path.basename(filePath)}`,
+      public: true,
+      metadata: {
+        contentType: 'text/csv',
+      }
+    });
+
+    const file = uploadResponse[0];
+    const publicUrl = `https://storage.googleapis.com/${bucket.name}/${file.name}`;
+
+    res.json({ message: 'Data saved and uploaded to Firebase Storage', url: publicUrl });
+
   } catch (error) {
+    console.error(error);
     res.status(500).json({ error: 'Internal server error', detail: error.message });
   }
 });
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
-  console.log(`Sensor data will be saved in: ${dataDir}`);
 });
