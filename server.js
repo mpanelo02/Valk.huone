@@ -1,6 +1,5 @@
 import express from 'express';
 import fetch from 'node-fetch';
-import rateLimit from 'express-rate-limit';
 import Joi from 'joi';
 
 const app = express();
@@ -12,13 +11,6 @@ if (!API_KEY || API_KEY.length !== 32) {
   console.error('Invalid ARANET_API_KEY configuration');
   process.exit(1);
 }
-
-// Rate limiting
-const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
-  message: 'Too many requests, please try again later'
-});
 
 // Request validation schema
 const sensorSchema = Joi.object({
@@ -34,7 +26,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get('/api/data', apiLimiter, async (req, res) => {
+app.get('/api/data', async (req, res) => {
   try {
     // Validate request query parameters
     const { error } = sensorSchema.validate(req.query);
