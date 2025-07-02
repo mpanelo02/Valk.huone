@@ -26,11 +26,36 @@ async function fetchHistoricalData(sensorId, metric) {
       throw new Error(`Failed to fetch data for sensor ${sensorId}, metric ${metric}`);
     }
     
-    return await response.json();
+    const data = await response.json();
+    
+    // Format the data to include both time and value
+    if (data.readings) {
+      return data.readings.map(reading => ({
+        time: reading.time, // Keep the original timestamp
+        value: reading.value,
+        // Or if you want formatted time:
+        // time: new Date(reading.time).toISOString(),
+        // timeFormatted: formatTime(new Date(reading.time))
+      }));
+    }
+    return [];
   } catch (error) {
     console.error(`Error fetching historical data: ${error.message}`);
-    return null;
+    return [];
   }
+}
+
+// Helper function to format time (optional)
+function formatTime(date) {
+  return date.toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
 }
 
 app.get('/api/data', async (req, res) => {
@@ -56,29 +81,32 @@ app.get('/api/data', async (req, res) => {
     const currentData2 = await current2.json();
     const currentData3 = await current3.json();
 
-    // Now fetch historical data for temperature (metric 1) from sensor 1061612
-    const tempHistory = await fetchHistoricalData(1061612, 1);
-    const humidityHistory = await fetchHistoricalData(1061612, 2);
-    
-    // Log the historical data to console
-    if (tempHistory && tempHistory.readings) {
-      console.log("Temperature History (first 10 readings):");
-      console.log(tempHistory.readings.slice(0, 10).map(r => r.value));
+    // Fetch historical data with timestamps
+    const [tempHistory, humidityHistory] = await Promise.all([
+      fetchHistoricalData(1061612, 1),
+      fetchHistoricalData(1061612, 2)
+    ]);
+
+    // Log sample data with timestamps
+    if (tempHistory.length > 0) {
+      console.log("Sample Temperature Data with Timestamps:");
+      console.log(tempHistory.slice(0, 3)); // Show first 3 entries with time and value
     }
     
-    if (humidityHistory && humidityHistory.readings) {
-      console.log("Humidity History (first 10 readings):");
-      console.log(humidityHistory.readings.slice(0, 10).map(r => r.value));
+    if (humidityHistory.length > 0) {
+      console.log("Sample Humidity Data with Timestamps:");
+      console.log(humidityHistory.slice(0, 3)); // Show first 3 entries with time and value
     }
 
     res.json({ 
       sensor1: currentData1, 
       sensor2: currentData2, 
       sensor3: currentData3,
-      tempHistory: tempHistory ? tempHistory.readings.slice(0, 1000) : [], // Limit to first 1000 readings
-      humidityHistory: humidityHistory ? humidityHistory.readings.slice(0, 1000) : [] // Limit to first 1000 readings
+      tempHistory: tempHistory.slice(0, 9999), // First 9999 temperature readings with time
+      humidityHistory: humidityHistory.slice(0, 9999) // First 9999 humidity readings with time
     });
   } catch (error) {
+    console.error("API Error:", error);
     res.status(500).json({ error: 'Internal server error', detail: error.message });
   }
 });
