@@ -94,12 +94,12 @@ app.get('/api/data', async (req, res) => {
       sensor1: currentData1, 
       sensor2: currentData2, 
       sensor3: currentData3,
-      tempHistory: tempHistory ? tempHistory.readings.slice(0, 1000) : [], // Limit to first 1000 readings
-      humidityHistory: humidityHistory ? humidityHistory.readings.slice(0, 1000) : [], // Limit to first 1000 readings
-      co2History: co2History ? co2History.readings.slice(0, 1000) : [], // Limit to first 1000 readings
-      atmosphericPressHistory: atmosphericPressHistory ? atmosphericPressHistory.readings.slice(0, 1000) : [], // Limit to first 1000 readings
-      moistureHistory: moistureHistory ? moistureHistory.readings.slice(0, 1000) : [], // Limit to first 1000 readings
-      soilECHistory: soilECHistory ? soilECHistory.readings.slice(0, 1000) : [] // Limit to first 1000 readings
+      tempHistory: tempHistory ? tempHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
+      humidityHistory: humidityHistory ? humidityHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
+      co2History: co2History ? co2History.readings.slice(0, 9999) : [], // Limit to first 9999 readings
+      atmosphericPressHistory: atmosphericPressHistory ? atmosphericPressHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
+      moistureHistory: moistureHistory ? moistureHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
+      soilECHistory: soilECHistory ? soilECHistory.readings.slice(0, 9999) : [] // Limit to first 9999 readings
     });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error', detail: error.message });
