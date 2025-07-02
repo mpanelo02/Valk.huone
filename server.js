@@ -59,10 +59,10 @@ app.get('/api/data', async (req, res) => {
     // Now fetch historical data for temperature (metric 1) from sensor 1061612
     const tempHistory = await fetchHistoricalData(1061612, 1);
     const humidityHistory = await fetchHistoricalData(1061612, 2);
-    const co2History = await fetchHistoricalData(6305245, 3);
-    const atmosphericPressHistory = await fetchHistoricalData(6305245, 4);
-    const moistureHistory = await fetchHistoricalData(3147479, 8);
-    const soilECHistory = await fetchHistoricalData(3147479, 10);
+    const co2History = await fetchHistoricalData(3147479, 3);
+    const atmosphericPressHistory = await fetchHistoricalData(3147479, 4);
+    const moistureHistory = await fetchHistoricalData(6305245, 8);
+    const soilECHistory = await fetchHistoricalData(6305245, 10);
     
     // Log the historical data to console
     if (tempHistory && tempHistory.readings) {
