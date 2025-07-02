@@ -1,4 +1,3 @@
-
 import express from 'express';
 import fetch from 'node-fetch';
 
@@ -13,9 +12,31 @@ app.use((req, res, next) => {
   next();
 });
 
+// Function to fetch historical data
+async function fetchHistoricalData(sensorId, metric) {
+  try {
+    const response = await fetch(
+      `https://aranet.cloud/api/v1/measurements/history?sensor=${sensorId}&metric=${metric}`, 
+      {
+        headers: { 'ApiKey': API_KEY, 'Content-Type': 'application/json' }
+      }
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch data for sensor ${sensorId}, metric ${metric}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error(`Error fetching historical data: ${error.message}`);
+    return null;
+  }
+}
+
 app.get('/api/data', async (req, res) => {
   try {
-    const [response1, response2, response3] = await Promise.all([
+    // First get the current data as before
+    const [current1, current2, current3] = await Promise.all([
       fetch(`https://aranet.cloud/api/v1/measurements/last?sensor=1061612`, {
         headers: { 'ApiKey': API_KEY, 'Content-Type': 'application/json' }
       }),
@@ -27,14 +48,36 @@ app.get('/api/data', async (req, res) => {
       })
     ]);
 
-    if (!response1.ok || !response2.ok || !response3.ok) {
-      return res.status(500).json({ error: 'Error fetching data from Aranet' });
+    if (!current1.ok || !current2.ok || !current3.ok) {
+      return res.status(500).json({ error: 'Error fetching current data from Aranet' });
     }
 
-    const data1 = await response1.json();
-    const data2 = await response2.json();
-    const data3 = await response3.json();
-    res.json({ sensor1: data1, sensor2: data2, sensor3: data3 });
+    const currentData1 = await current1.json();
+    const currentData2 = await current2.json();
+    const currentData3 = await current3.json();
+
+    // Now fetch historical data for temperature (metric 1) from sensor 1061612
+    const tempHistory = await fetchHistoricalData(1061612, 1);
+    const humidityHistory = await fetchHistoricalData(1061612, 2);
+    
+    // Log the historical data to console
+    if (tempHistory && tempHistory.readings) {
+      console.log("Temperature History (first 10 readings):");
+      console.log(tempHistory.readings.slice(0, 10).map(r => r.value));
+    }
+    
+    if (humidityHistory && humidityHistory.readings) {
+      console.log("Humidity History (first 10 readings):");
+      console.log(humidityHistory.readings.slice(0, 10).map(r => r.value));
+    }
+
+    res.json({ 
+      sensor1: currentData1, 
+      sensor2: currentData2, 
+      sensor3: currentData3,
+      tempHistory: tempHistory ? tempHistory.readings.slice(0, 1000) : [], // Limit to first 1000 readings
+      humidityHistory: humidityHistory ? humidityHistory.readings.slice(0, 1000) : [] // Limit to first 1000 readings
+    });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error', detail: error.message });
   }
