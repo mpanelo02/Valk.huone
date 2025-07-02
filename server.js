@@ -59,16 +59,35 @@ app.get('/api/data', async (req, res) => {
     // Now fetch historical data for temperature (metric 1) from sensor 1061612
     const tempHistory = await fetchHistoricalData(1061612, 1);
     const humidityHistory = await fetchHistoricalData(1061612, 2);
+    const co2History = await fetchHistoricalData(6305245, 3);
+    const atmosphericPressHistory = await fetchHistoricalData(6305245, 4);
+    const moistureHistory = await fetchHistoricalData(3147479, 8);
+    const soilECHistory = await fetchHistoricalData(3147479, 10);
     
     // Log the historical data to console
     if (tempHistory && tempHistory.readings) {
       console.log("Temperature History (first 10 readings):");
       console.log(tempHistory.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
     }
-    
-    if (humidityHistory && humidityHistory.readings) {
+        if (humidityHistory && humidityHistory.readings) {
       console.log("Humidity History (first 10 readings):");
       console.log(humidityHistory.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
+    }
+    if (co2History && co2History.readings) {
+      console.log("CO2 History (first 10 readings):");
+      console.log(co2History.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
+    }
+    if (atmosphericPressHistory && atmosphericPressHistory.readings) {
+      console.log("Atmospheric Pressure History (first 10 readings):");
+      console.log(atmosphericPressHistory.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
+    }
+    if (moistureHistory && moistureHistory.readings) {
+      console.log("Moisture History (first 10 readings):");
+      console.log(moistureHistory.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
+    }
+    if (soilECHistory && soilECHistory.readings) {
+      console.log("Soil EC History (first 10 readings):");
+      console.log(soilECHistory.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
     }
 
     res.json({ 
@@ -76,7 +95,11 @@ app.get('/api/data', async (req, res) => {
       sensor2: currentData2, 
       sensor3: currentData3,
       tempHistory: tempHistory ? tempHistory.readings.slice(0, 1000) : [], // Limit to first 1000 readings
-      humidityHistory: humidityHistory ? humidityHistory.readings.slice(0, 1000) : [] // Limit to first 1000 readings
+      humidityHistory: humidityHistory ? humidityHistory.readings.slice(0, 1000) : [], // Limit to first 1000 readings
+      co2History: co2History ? co2History.readings.slice(0, 1000) : [], // Limit to first 1000 readings
+      atmosphericPressHistory: atmosphericPressHistory ? atmosphericPressHistory.readings.slice(0, 1000) : [], // Limit to first 1000 readings
+      moistureHistory: moistureHistory ? moistureHistory.readings.slice(0, 1000) : [], // Limit to first 1000 readings
+      soilECHistory: soilECHistory ? soilECHistory.readings.slice(0, 1000) : [] // Limit to first 1000 readings
     });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error', detail: error.message });
