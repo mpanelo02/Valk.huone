@@ -63,6 +63,7 @@ app.get('/api/data', async (req, res) => {
     const atmosphericPressHistory = await fetchHistoricalData(3147479, 4);
     const moistureHistory = await fetchHistoricalData(6305245, 8);
     const soilECHistory = await fetchHistoricalData(6305245, 10);
+    const poreECHistory = await fetchHistoricalData(6305245, 11);
     
     // Log the historical data to console
     if (tempHistory && tempHistory.readings) {
@@ -89,6 +90,10 @@ app.get('/api/data', async (req, res) => {
       console.log("Soil EC History (first 10 readings):");
       console.log(soilECHistory.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
     }
+    if (poreECHistory && poreECHistory.readings) {
+      console.log("Pore EC History (first 10 readings):");
+      console.log(poreECHistory.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
+    }
 
     res.json({ 
       sensor1: currentData1, 
@@ -99,7 +104,8 @@ app.get('/api/data', async (req, res) => {
       co2History: co2History ? co2History.readings.slice(0, 9999) : [], // Limit to first 9999 readings
       atmosphericPressHistory: atmosphericPressHistory ? atmosphericPressHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
       moistureHistory: moistureHistory ? moistureHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
-      soilECHistory: soilECHistory ? soilECHistory.readings.slice(0, 9999) : [] // Limit to first 9999 readings
+      soilECHistory: soilECHistory ? soilECHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
+      poreECHistory: poreECHistory ? poreECHistory.readings.slice(0, 9999) : [] // Limit to first 9999 readings
     });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error', detail: error.message });
