@@ -106,34 +106,34 @@ app.get('/api/data', async (req, res) => {
     const poreECHistory = await fetchHistoricalData(6305245, 11);
     
     // Log the historical data to console
-    if (tempHistory && tempHistory.readings) {
-      console.log("Temperature History (first 10 readings):");
-      console.log(tempHistory.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
-    }
-    if (humidityHistory && humidityHistory.readings) {
-      console.log("Humidity History (first 10 readings):");
-      console.log(humidityHistory.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
-    }
-    if (co2History && co2History.readings) {
-      console.log("CO2 History (first 10 readings):");
-      console.log(co2History.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
-    }
-    if (atmosphericPressHistory && atmosphericPressHistory.readings) {
-      console.log("Atmospheric Pressure History (first 10 readings):");
-      console.log(atmosphericPressHistory.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
-    }
-    if (moistureHistory && moistureHistory.readings) {
-      console.log("Moisture History (first 10 readings):");
-      console.log(moistureHistory.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
-    }
-    if (soilECHistory && soilECHistory.readings) {
-      console.log("Soil EC History (first 10 readings):");
-      console.log(soilECHistory.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
-    }
-    if (poreECHistory && poreECHistory.readings) {
-      console.log("Pore EC History (first 10 readings):");
-      console.log(poreECHistory.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
-    }
+    // if (tempHistory && tempHistory.readings) {
+    //   console.log("Temperature History (first 10 readings):");
+    //   console.log(tempHistory.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
+    // }
+    // if (humidityHistory && humidityHistory.readings) {
+    //   console.log("Humidity History (first 10 readings):");
+    //   console.log(humidityHistory.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
+    // }
+    // if (co2History && co2History.readings) {
+    //   console.log("CO2 History (first 10 readings):");
+    //   console.log(co2History.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
+    // }
+    // if (atmosphericPressHistory && atmosphericPressHistory.readings) {
+    //   console.log("Atmospheric Pressure History (first 10 readings):");
+    //   console.log(atmosphericPressHistory.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
+    // }
+    // if (moistureHistory && moistureHistory.readings) {
+    //   console.log("Moisture History (first 10 readings):");
+    //   console.log(moistureHistory.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
+    // }
+    // if (soilECHistory && soilECHistory.readings) {
+    //   console.log("Soil EC History (first 10 readings):");
+    //   console.log(soilECHistory.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
+    // }
+    // if (poreECHistory && poreECHistory.readings) {
+    //   console.log("Pore EC History (first 10 readings):");
+    //   console.log(poreECHistory.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
+    // }
 
     res.json({ 
       sensor1: currentData1, 
