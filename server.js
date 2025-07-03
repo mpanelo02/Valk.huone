@@ -14,6 +14,8 @@ app.use((req, res, next) => {
 });
 
 // Function to fetch Sigrow camera last shot
+// Update the fetchLastCameraShot function in server.js
+// In server.js
 async function fetchLastCameraShot() {
   try {
     console.log('Attempting to fetch camera shots...');
@@ -37,13 +39,53 @@ async function fetchLastCameraShot() {
     console.log('Received camera data:', data);
     
     if (data && data.length > 0) {
-      // Get the last shot (assuming shots are ordered chronologically)
+      // Get the last shot
       const lastShot = data[data.length - 1];
       console.log('Last camera shot ID:', lastShot.id);
-      return lastShot;
+      console.log('Shot timestamp:', lastShot.date?.in_gmt_timezone || 'N/A');
+      
+      // Fetch the shot details to get the image URL
+      console.log(`Fetching details for shot ID: ${lastShot.id}`);
+      const shotResponse = await fetch(
+        `https://app.sigrow.com/api/v2/camera/1171/shot/${lastShot.id}/source`,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-Key': SIGROW_API_KEY
+          }
+        }
+      );
+      
+      if (!shotResponse.ok) {
+        throw new Error(`Failed to fetch shot details: ${shotResponse.statusText}`);
+      }
+      
+      const shotData = await shotResponse.json();
+      console.log('Shot details:', {
+        id: shotData.id,
+        timestamp: shotData.date.in_gmt_timezone,
+        sources: shotData.sources.map(s => s.type)
+      });
+      
+      // Find the RGB JPG source
+      const rgbSource = shotData.sources.find(source => source.type === "RGB_JPG");
+      
+      if (rgbSource) {
+        console.log('Found RGB image URL:', rgbSource.url);
+        return {
+          id: lastShot.id,
+          imageUrl: rgbSource.url,
+          timestamp: shotData.date.in_gmt_timezone,
+          temperature: shotData.climate_sensor_temperature,
+          humidity: shotData.climate_sensor_humidity
+        };
+      } else {
+        console.log('No RGB image found in sources');
+      }
+    } else {
+      console.log('No camera shots found in response');
     }
     
-    console.log('No camera shots found');
     return null;
   } catch (error) {
     console.error(`Error fetching camera shots: ${error.message}`);
