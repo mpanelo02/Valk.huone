@@ -127,19 +127,34 @@ async function fetchHistoricalData(sensorId, metric) {
 
 app.get('/api/data', async (req, res) => {
   try {
+    console.log('Fetching sensor data...');
     // First get the current data as before
-    const [current1, current2, current3, cameraShot] = await Promise.all([
+    const [current1, current2, current3] = await Promise.all([
       fetch(`https://aranet.cloud/api/v1/measurements/last?sensor=1061612`, {
         headers: { 'ApiKey': API_KEY, 'Content-Type': 'application/json' }
+      }).then(res => {
+        if (!res.ok) throw new Error(`Sensor1 failed: ${res.statusText}`);
+        return res.json();
       }),
       fetch(`https://aranet.cloud/api/v1/measurements/last?sensor=6305245`, {
         headers: { 'ApiKey': API_KEY, 'Content-Type': 'application/json' }
+      }).then(res => {
+        if (!res.ok) throw new Error(`Sensor2 failed: ${res.statusText}`);
+        return res.json();
       }),
       fetch(`https://aranet.cloud/api/v1/measurements/last?sensor=3147479`, {
         headers: { 'ApiKey': API_KEY, 'Content-Type': 'application/json' }
-      }),
-      fetchLastCameraShot() // Get the camera shot data
+      }).then(res => {
+        if (!res.ok) throw new Error(`Sensor3 failed: ${res.statusText}`);
+        return res.json();
+      })
     ]);
+
+    console.log('Sensor data fetched successfully:', {
+      sensor1: current1,
+      sensor2: current2,
+      sensor3: current3
+    });
 
     if (!current1.ok || !current2.ok || !current3.ok) {
       return res.status(500).json({ error: 'Error fetching current data from Aranet' });
@@ -201,11 +216,13 @@ app.get('/api/data', async (req, res) => {
       poreECHistory: poreECHistory ? poreECHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
       lastCameraShot: cameraShot // Include the camera shot data in the response
     });
+    
   } catch (error) {
-    res.status(500).json({ error: 'Internal server error', detail: error.message });
+    console.error('API Error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error',
+      detail: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
-});
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
 });
