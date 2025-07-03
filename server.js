@@ -16,6 +16,7 @@ app.use((req, res, next) => {
 // Function to fetch Sigrow camera last shot
 async function fetchLastCameraShot() {
   try {
+    console.log('Attempting to fetch camera shots...');
     const response = await fetch(
       'https://app.sigrow.com/api/v2/camera/1171/shots',
       {
@@ -26,26 +27,29 @@ async function fetchLastCameraShot() {
       }
     );
     
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const data = await response.json();
-                console.log('Full API response:', data);
+    console.log('Response status:', response.status);
 
-                const shots = data.shots; // Adjust this line based on actual structure
+    if (!response.ok) {
+      throw new Error(`Failed to fetch camera shots: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    console.log('Received camera data:', data);
+    
+    if (data && data.length > 0) {
+      // Get the last shot (assuming shots are ordered chronologically)
+      const lastShot = data[data.length - 1];
+      console.log('Last camera shot ID:', lastShot.id);
+      return lastShot;
+    }
 
-                if (Array.isArray(shots) && shots.length > 0) {
-                    const lastShot = shots[shots.length - 1];
-                    console.log('Last shot ID:', lastShot.id);
-                } else {
-                    console.log('No shots found.');
-                }
-            } catch (error) {
-                console.error('Fetch error:', error);
-            }
+    console.log('No camera shots found');
+    return null;
+  } catch (error) {
+    console.error(`Error fetching camera shots: ${error.message}`);
+    return null;
+  }
 }
-
-fetchLastCameraShot();
 
 // Function to fetch historical data
 async function fetchHistoricalData(sensorId, metric) {
