@@ -50,6 +50,7 @@ async function fetchLastCameraShot() {
     return null;
   }
 }
+fetchLastCameraShot(); // Call this function to ensure it runs at server start
 
 // Function to fetch historical data
 async function fetchHistoricalData(sensorId, metric) {
