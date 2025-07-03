@@ -26,25 +26,26 @@ async function fetchLastCameraShot() {
       }
     );
     
-    if (!response.ok) {
-      throw new Error(`Failed to fetch camera shots: ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    
-    if (data && data.length > 0) {
-      // Get the last shot (assuming shots are ordered chronologically)
-      const lastShot = data[data.length - 1];
-      console.log('Last camera shot ID:', lastShot.id);
-      return lastShot;
-    }
-    
-    return null;
-  } catch (error) {
-    console.error(`Error fetching camera shots: ${error.message}`);
-    return null;
-  }
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const data = await response.json();
+                console.log('Full API response:', data);
+
+                const shots = data.shots; // Adjust this line based on actual structure
+
+                if (Array.isArray(shots) && shots.length > 0) {
+                    const lastShot = shots[shots.length - 1];
+                    console.log('Last shot ID:', lastShot.id);
+                } else {
+                    console.log('No shots found.');
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+            }
 }
+
+fetchLastCameraShot();
 
 // Function to fetch historical data
 async function fetchHistoricalData(sensorId, metric) {
