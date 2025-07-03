@@ -4,6 +4,7 @@ import fetch from 'node-fetch';
 const app = express();
 const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.ARANET_API_KEY;
+const SIGROW_API_KEY = process.env.SIGROW_API_KEY; // Consider moving this to environment variables too
 
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
@@ -11,6 +12,39 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   next();
 });
+
+// Function to fetch Sigrow camera last shot
+async function fetchLastCameraShot() {
+  try {
+    const response = await fetch(
+      'https://app.sigrow.com/api/v2/camera/1171/shots',
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': SIGROW_API_KEY
+        }
+      }
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch camera shots: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    if (data && data.length > 0) {
+      // Get the last shot (assuming shots are ordered chronologically)
+      const lastShot = data[data.length - 1];
+      console.log('Last camera shot ID:', lastShot.id);
+      return lastShot;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error(`Error fetching camera shots: ${error.message}`);
+    return null;
+  }
+}
 
 // Function to fetch historical data
 async function fetchHistoricalData(sensorId, metric) {
@@ -36,7 +70,7 @@ async function fetchHistoricalData(sensorId, metric) {
 app.get('/api/data', async (req, res) => {
   try {
     // First get the current data as before
-    const [current1, current2, current3] = await Promise.all([
+    const [current1, current2, current3, cameraShot] = await Promise.all([
       fetch(`https://aranet.cloud/api/v1/measurements/last?sensor=1061612`, {
         headers: { 'ApiKey': API_KEY, 'Content-Type': 'application/json' }
       }),
@@ -45,7 +79,8 @@ app.get('/api/data', async (req, res) => {
       }),
       fetch(`https://aranet.cloud/api/v1/measurements/last?sensor=3147479`, {
         headers: { 'ApiKey': API_KEY, 'Content-Type': 'application/json' }
-      })
+      }),
+      fetchLastCameraShot() // Get the camera shot data
     ]);
 
     if (!current1.ok || !current2.ok || !current3.ok) {
@@ -70,7 +105,7 @@ app.get('/api/data', async (req, res) => {
       console.log("Temperature History (first 10 readings):");
       console.log(tempHistory.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
     }
-        if (humidityHistory && humidityHistory.readings) {
+    if (humidityHistory && humidityHistory.readings) {
       console.log("Humidity History (first 10 readings):");
       console.log(humidityHistory.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
     }
@@ -105,7 +140,8 @@ app.get('/api/data', async (req, res) => {
       atmosphericPressHistory: atmosphericPressHistory ? atmosphericPressHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
       moistureHistory: moistureHistory ? moistureHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
       soilECHistory: soilECHistory ? soilECHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
-      poreECHistory: poreECHistory ? poreECHistory.readings.slice(0, 9999) : [] // Limit to first 9999 readings
+      poreECHistory: poreECHistory ? poreECHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
+      lastCameraShot: cameraShot // Include the camera shot data in the response
     });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error', detail: error.message });
