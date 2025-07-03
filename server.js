@@ -20,75 +20,55 @@ const base_api_url = "https://app.sigrow.com/api/v2/camera/1171/shots";
             'X-API-Key': SIGROW_API_KEY
         };
 
-        async function fetchLastCameraShot() {
-            try {
-                // First fetch to get the latest shot ID
-                const response = await fetch(base_api_url, {
-                    method: 'GET',
-                    headers: headers
-                });
+async function fetchLastCameraShot() {
+    try {
+        const response = await fetch(base_api_url, {
+            method: 'GET',
+            headers: headers
+        });
 
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const data = await response.json();
-                console.log('Shots API response:', data);
-
-                const shots = data.shots;
-
-                if (Array.isArray(shots) && shots.length > 0) {
-                    const lastShot = shots[shots.length - 1];
-                    console.log('Last shot ID:', lastShot.id);
-
-                    // Construct URL using lastShot.id
-                    const image_url = `https://app.sigrow.com/api/v2/camera/1171/shot/${lastShot.id}/source`;
-
-                    // Second fetch to get the image sources
-                    const imageResponse = await fetch(image_url, {
-                        method: 'GET',
-                        headers: headers
-                    });
-
-                    if (!imageResponse.ok) {
-                        throw new Error(`Image fetch error! status: ${imageResponse.status}`);
-                    }
-
-                    const imageData = await imageResponse.json();
-                    console.log('Image sources API response:', imageData);
-                    
-                    // Use imageData.sources instead of data.sources
-                    const sources = imageData.sources;
-                    if (Array.isArray(sources)) {
-                        // Find the RGB_JPG source
-                        const rgbImage = sources.find(source => source.type === "RGB_JPG");
-
-                        if (rgbImage) {
-                            const img = document.createElement('img');
-                            img.src = rgbImage.url;
-                            img.alt = "RGB Image";
-                            img.style.maxWidth = "100%";
-                            img.style.border = "2px solid #ccc";
-
-                            const container = document.getElementById('image-container');
-                            container.innerHTML = ""; // clear loading text
-                            container.appendChild(img);
-                        } else {
-                            document.getElementById('image-container').textContent = "RGB image not found.";
-                        }
-                    } else {
-                        document.getElementById('image-container').textContent = "No sources available.";
-                    }
-                } else {
-                    document.getElementById('image-container').textContent = "No shots available.";
-                }
-            } catch (error) {
-                console.error('Fetch error:', error);
-                document.getElementById('image-container').textContent = "Failed to load image.";
-            }
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        fetchLastCameraShot();
+        const data = await response.json();
+        const shots = data.shots;
+
+        if (Array.isArray(shots) && shots.length > 0) {
+            const lastShot = shots[shots.length - 1];
+            const image_url = `https://app.sigrow.com/api/v2/camera/1171/shot/${lastShot.id}/source`;
+
+            const imageResponse = await fetch(image_url, {
+                method: 'GET',
+                headers: headers
+            });
+
+            if (!imageResponse.ok) {
+                throw new Error(`Image fetch error! status: ${imageResponse.status}`);
+            }
+
+            const imageData = await imageResponse.json();
+            const sources = imageData.sources;
+            
+            if (Array.isArray(sources)) {
+                const rgbImage = sources.find(source => source.type === "RGB_JPG");
+                if (rgbImage) {
+                    return {
+                        id: lastShot.id,
+                        timestamp: lastShot.timestamp,
+                        imageUrl: rgbImage.url
+                    };
+                }
+            }
+        }
+        return null;
+    } catch (error) {
+        console.error('Fetch error:', error);
+        return null;
+    }
+}
+
+fetchLastCameraShot();
 
 // Function to fetch historical data
 async function fetchHistoricalData(sensorId, metric) {
