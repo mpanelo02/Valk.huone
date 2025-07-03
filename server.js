@@ -14,42 +14,95 @@ app.use((req, res, next) => {
 });
 
 // Function to fetch Sigrow camera last shot
-async function fetchLastCameraShot() {
+// Add these functions to your server.js
+async function fetchLatestShotId() {
   try {
-    console.log('Attempting to fetch camera shots...');
     const response = await fetch(
       'https://app.sigrow.com/api/v2/camera/1171/shots',
       {
         headers: {
           'Content-Type': 'application/json',
-          'X-API-Key': SIGROW_API_KEY
+          'X-API-Key': process.env.SIGROW_API_KEY
         }
       }
     );
     
-    console.log('Response status:', response.status);
-
     if (!response.ok) {
       throw new Error(`Failed to fetch camera shots: ${response.statusText}`);
     }
     
     const data = await response.json();
-    console.log('Received camera data:', data);
     
     if (data && data.length > 0) {
-      // Get the last shot (assuming shots are ordered chronologically)
       const lastShot = data[data.length - 1];
-      console.log('Last camera shot ID:', lastShot.id);
-      return lastShot;
+      console.log('Latest shot ID:', lastShot.id); // Log the shot ID
+      return lastShot.id;
     }
-
-    console.log('No camera shots found');
+    
     return null;
   } catch (error) {
     console.error(`Error fetching camera shots: ${error.message}`);
     return null;
   }
 }
+
+async function fetchCameraImage(shotId) {
+  try {
+    const response = await fetch(
+      `https://app.sigrow.com/api/v2/camera/1171/shot/${shotId}/source`,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-Key': process.env.SIGROW_API_KEY
+        }
+      }
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch camera image: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    // Find the RGB image URL from the sources array
+    const rgbImage = data.sources.find(source => source.type === 'RGB_JPG');
+    
+    if (rgbImage) {
+      return {
+        imageUrl: rgbImage.url,
+        timestamp: data.date.in_gmt_timezone,
+        temperature: data.climate_sensor_temperature,
+        humidity: data.climate_sensor_humidity
+      };
+    }
+    
+    return null;
+  } catch (error) {
+    console.error(`Error fetching camera image: ${error.message}`);
+    return null;
+  }
+}
+
+// Update the camera endpoint
+app.get('/api/camera', async (req, res) => {
+  try {
+    // First get the latest shot ID
+    const shotId = await fetchLatestShotId();
+    if (!shotId) {
+      return res.status(404).json({ error: 'No camera shots found' });
+    }
+    
+    // Then get the image data using the shot ID
+    const imageData = await fetchCameraImage(shotId);
+    if (imageData) {
+      res.json(imageData);
+    } else {
+      res.status(404).json({ error: 'No camera image found' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Function to fetch historical data
 async function fetchHistoricalData(sensorId, metric) {
