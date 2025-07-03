@@ -4,7 +4,7 @@ import fetch from 'node-fetch';
 const app = express();
 const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.ARANET_API_KEY;
-const SIGROW_API_KEY = '2941b320-be67-409b-a501-b3fbd18986d3'; // Consider moving this to environment variables too
+const SIGROW_API_KEY = process.env.SIGROW_API_KEY; // Consider moving this to environment variables too
 
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
@@ -16,6 +16,7 @@ app.use((req, res, next) => {
 // Function to fetch Sigrow camera last shot
 async function fetchLastCameraShot() {
   try {
+    console.log('Attempting to fetch camera shots...');
     const response = await fetch(
       'https://app.sigrow.com/api/v2/camera/1171/shots',
       {
@@ -25,12 +26,15 @@ async function fetchLastCameraShot() {
         }
       }
     );
+
+    console.log('Response status:', response.status);
     
     if (!response.ok) {
       throw new Error(`Failed to fetch camera shots: ${response.statusText}`);
     }
     
     const data = await response.json();
+    console.log('Received camera data:', data);
     
     if (data && data.length > 0) {
       // Get the last shot (assuming shots are ordered chronologically)
@@ -39,6 +43,7 @@ async function fetchLastCameraShot() {
       return lastShot;
     }
     
+    console.log('No camera shots found');
     return null;
   } catch (error) {
     console.error(`Error fetching camera shots: ${error.message}`);
