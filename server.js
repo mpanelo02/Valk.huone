@@ -128,101 +128,57 @@ async function fetchHistoricalData(sensorId, metric) {
 app.get('/api/data', async (req, res) => {
   try {
     console.log('Fetching sensor data...');
-    // First get the current data as before
+    
+    // First get the current data
     const [current1, current2, current3] = await Promise.all([
       fetch(`https://aranet.cloud/api/v1/measurements/last?sensor=1061612`, {
         headers: { 'ApiKey': API_KEY, 'Content-Type': 'application/json' }
-      }).then(res => {
-        if (!res.ok) throw new Error(`Sensor1 failed: ${res.statusText}`);
-        return res.json();
-      }),
+      }).then(res => res.ok ? res.json() : Promise.reject(new Error(`Sensor1 failed: ${res.statusText}`))),
       fetch(`https://aranet.cloud/api/v1/measurements/last?sensor=6305245`, {
         headers: { 'ApiKey': API_KEY, 'Content-Type': 'application/json' }
-      }).then(res => {
-        if (!res.ok) throw new Error(`Sensor2 failed: ${res.statusText}`);
-        return res.json();
-      }),
+      }).then(res => res.ok ? res.json() : Promise.reject(new Error(`Sensor2 failed: ${res.statusText}`))),
       fetch(`https://aranet.cloud/api/v1/measurements/last?sensor=3147479`, {
         headers: { 'ApiKey': API_KEY, 'Content-Type': 'application/json' }
-      }).then(res => {
-        if (!res.ok) throw new Error(`Sensor3 failed: ${res.statusText}`);
-        return res.json();
-      })
+      }).then(res => res.ok ? res.json() : Promise.reject(new Error(`Sensor3 failed: ${res.statusText}`)))
     ]);
 
-    console.log('Sensor data fetched successfully:', {
-      sensor1: current1,
-      sensor2: current2,
-      sensor3: current3
-    });
-
-    if (!current1.ok || !current2.ok || !current3.ok) {
-      return res.status(500).json({ error: 'Error fetching current data from Aranet' });
-    }
-
-    const currentData1 = await current1.json();
-    const currentData2 = await current2.json();
-    const currentData3 = await current3.json();
-
-    // Now fetch historical data for temperature (metric 1) from sensor 1061612
-    const tempHistory = await fetchHistoricalData(1061612, 1);
-    const humidityHistory = await fetchHistoricalData(1061612, 2);
-    const co2History = await fetchHistoricalData(3147479, 3);
-    const atmosphericPressHistory = await fetchHistoricalData(3147479, 4);
-    const moistureHistory = await fetchHistoricalData(6305245, 8);
-    const soilECHistory = await fetchHistoricalData(6305245, 10);
-    const poreECHistory = await fetchHistoricalData(6305245, 11);
-    
-    // Log the historical data to console
-    if (tempHistory && tempHistory.readings) {
-      console.log("Temperature History (first 10 readings):");
-      console.log(tempHistory.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
-    }
-    if (humidityHistory && humidityHistory.readings) {
-      console.log("Humidity History (first 10 readings):");
-      console.log(humidityHistory.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
-    }
-    if (co2History && co2History.readings) {
-      console.log("CO2 History (first 10 readings):");
-      console.log(co2History.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
-    }
-    if (atmosphericPressHistory && atmosphericPressHistory.readings) {
-      console.log("Atmospheric Pressure History (first 10 readings):");
-      console.log(atmosphericPressHistory.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
-    }
-    if (moistureHistory && moistureHistory.readings) {
-      console.log("Moisture History (first 10 readings):");
-      console.log(moistureHistory.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
-    }
-    if (soilECHistory && soilECHistory.readings) {
-      console.log("Soil EC History (first 10 readings):");
-      console.log(soilECHistory.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
-    }
-    if (poreECHistory && poreECHistory.readings) {
-      console.log("Pore EC History (first 10 readings):");
-      console.log(poreECHistory.readings.slice(0, 10).map(r => ({ time: r.time, value: r.value })));
-    }
+    // Fetch historical data
+    const [
+      tempHistory,
+      humidityHistory,
+      co2History,
+      atmosphericPressHistory,
+      moistureHistory,
+      soilECHistory,
+      poreECHistory
+    ] = await Promise.all([
+      fetchHistoricalData(1061612, 1),
+      fetchHistoricalData(1061612, 2),
+      fetchHistoricalData(3147479, 3),
+      fetchHistoricalData(3147479, 4),
+      fetchHistoricalData(6305245, 8),
+      fetchHistoricalData(6305245, 10),
+      fetchHistoricalData(6305245, 11)
+    ]);
 
     res.json({ 
-      sensor1: currentData1, 
-      sensor2: currentData2, 
-      sensor3: currentData3,
-      tempHistory: tempHistory ? tempHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
-      humidityHistory: humidityHistory ? humidityHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
-      co2History: co2History ? co2History.readings.slice(0, 9999) : [], // Limit to first 9999 readings
-      atmosphericPressHistory: atmosphericPressHistory ? atmosphericPressHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
-      moistureHistory: moistureHistory ? moistureHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
-      soilECHistory: soilECHistory ? soilECHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
-      poreECHistory: poreECHistory ? poreECHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
-      lastCameraShot: cameraShot // Include the camera shot data in the response
+      sensor1: current1, 
+      sensor2: current2, 
+      sensor3: current3,
+      tempHistory: tempHistory?.readings?.slice(0, 9999) || [],
+      humidityHistory: humidityHistory?.readings?.slice(0, 9999) || [],
+      co2History: co2History?.readings?.slice(0, 9999) || [],
+      atmosphericPressHistory: atmosphericPressHistory?.readings?.slice(0, 9999) || [],
+      moistureHistory: moistureHistory?.readings?.slice(0, 9999) || [],
+      soilECHistory: soilECHistory?.readings?.slice(0, 9999) || [],
+      poreECHistory: poreECHistory?.readings?.slice(0, 9999) || []
     });
     
   } catch (error) {
     console.error('API Error:', error);
     res.status(500).json({ 
       error: 'Internal server error',
-      detail: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      detail: error.message
     });
   }
 });
