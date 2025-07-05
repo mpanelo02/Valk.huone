@@ -1,11 +1,64 @@
 import express from 'express';
 import fetch from 'node-fetch';
+import pg from 'pg'; // Add PostgreSQL client
 import bodyParser from 'body-parser';
 
+
+const { Pool } = pg;
 const app = express();
 const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.ARANET_API_KEY;
 const SIGROW_API_KEY = process.env.SIGROW_API_KEY; // Consider moving this to environment variables too
+
+// PostgreSQL connection
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL || 'your-local-connection-string',
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
+
+// Create table if it doesn't exist
+async function initDB() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS device_states (
+        device VARCHAR(20) PRIMARY KEY,
+        state VARCHAR(10) NOT NULL
+      );
+      
+      INSERT INTO device_states (device, state)
+      VALUES ('fan', 'OFF'), ('plantLight', 'OFF'), ('pump', 'OFF')
+      ON CONFLICT (device) DO NOTHING;
+    `);
+    console.log('Database initialized');
+  } catch (err) {
+    console.error('Database initialization error:', err);
+  }
+}
+
+initDB();
+
+// Middleware
+app.use(bodyParser.json());
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  next();
+});
+
+// Get all device states
+app.get('/api/device-states', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM device_states');
+    const states = {};
+    result.rows.forEach(row => {
+      states[row.device] = row.state;
+    });
+    res.json(states);
+  } catch (err) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
@@ -156,17 +209,29 @@ app.get('/api/device-states', (req, res) => {
   res.json(deviceStates);
 });
 
-app.post('/api/update-device-state', (req, res) => {
+app.post('/api/update-device-state', async (req, res) => {
   const { device, state } = req.body;
   
-  if (deviceStates.hasOwnProperty(device)) {
-    deviceStates[device] = state;
+  if (!['fan', 'plantLight', 'pump'].includes(device)) {
+    return res.status(400).json({ error: 'Invalid device' });
+  }
+
+  try {
+    await pool.query(
+      'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
+      'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
+      [device, state]
+    );
     res.json({ success: true });
-  } else {
-    res.status(400).json({ error: 'Invalid device' });
+  } catch (err) {
+    res.status(500).json({ error: 'Database error' });
   }
 });
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
+
+
+
