@@ -1,5 +1,6 @@
 import express from 'express';
 import fetch from 'node-fetch';
+import bodyParser from 'body-parser';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,6 +13,8 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   next();
 });
+
+app.use(bodyParser.json());
 
 
 const base_api_url = "https://app.sigrow.com/api/v2/camera/1171/shots";
@@ -140,6 +143,27 @@ app.get('/api/data', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: 'Internal server error', detail: error.message });
+  }
+});
+
+let deviceStates = {
+  fan: "OFF",
+  plantLight: "OFF",
+  pump: "OFF"
+};
+
+app.get('/api/device-states', (req, res) => {
+  res.json(deviceStates);
+});
+
+app.post('/api/update-device-state', (req, res) => {
+  const { device, state } = req.body;
+  
+  if (deviceStates.hasOwnProperty(device)) {
+    deviceStates[device] = state;
+    res.json({ success: true });
+  } else {
+    res.status(400).json({ error: 'Invalid device' });
   }
 });
 
