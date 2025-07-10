@@ -16,26 +16,6 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
-// Create table if it doesn't exist
-// async function initDB() {
-//   try {
-//     await pool.query(`
-//       CREATE TABLE IF NOT EXISTS light_intensity (
-//         id SERIAL PRIMARY KEY,
-//         value INT NOT NULL,
-//         created_at TIMESTAMP DEFAULT NOW()
-//       );
-      
-//       -- Insert default value only if table is empty
-//       INSERT INTO light_intensity (value) 
-//       SELECT 50 WHERE NOT EXISTS (SELECT 1 FROM light_intensity);
-//     `);
-//     console.log('Database initialized');
-//   } catch (err) {
-//     console.error('Database initialization error:', err);
-//   }
-// }
-
 async function initDB() {
   try {
     await pool.query(`
@@ -68,22 +48,16 @@ async function initDB() {
   }
 }
 
-// initDB();
+// Middleware
+app.use(bodyParser.json());
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  next();
+});
 
-// Add to server.js (after the device_states table creation)
-// await pool.query(`
-//   CREATE TABLE IF NOT EXISTS light_intensity (
-//     id SERIAL PRIMARY KEY,
-//     value INT NOT NULL,
-//     created_at TIMESTAMP DEFAULT NOW()
-//   );
-  
-//   -- Insert default value only if table is empty
-//   INSERT INTO light_intensity (value) 
-//   SELECT 50 WHERE NOT EXISTS (SELECT 1 FROM light_intensity);
-// `);
 
-// Add new endpoint to get light intensity
+// Light intensity endpoints
 app.get('/api/light-intensity', async (req, res) => {
   try {
     const result = await pool.query(
@@ -98,7 +72,6 @@ app.get('/api/light-intensity', async (req, res) => {
 
 
 
-// Add new endpoint to update light intensity
 app.post('/api/light-intensity', async (req, res) => {
   const { intensity } = req.body;
   
@@ -118,17 +91,6 @@ app.post('/api/light-intensity', async (req, res) => {
   }
 });
 
-async function startServer() {
-  try {
-    await initDB();
-
-// Middleware
-app.use(bodyParser.json());
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  next();
-});
 
 // Get all device states
 app.get('/api/device-states', async (req, res) => {
@@ -311,6 +273,10 @@ app.post('/api/update-device-state', async (req, res) => {
     res.status(500).json({ error: 'Database error' });
   }
 });
+
+async function startServer() {
+  try {
+    await initDB();
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
