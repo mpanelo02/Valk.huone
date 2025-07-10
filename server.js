@@ -17,9 +17,33 @@ const pool = new Pool({
 });
 
 // Create table if it doesn't exist
+// async function initDB() {
+//   try {
+//     await pool.query(`
+//       CREATE TABLE IF NOT EXISTS light_intensity (
+//         id SERIAL PRIMARY KEY,
+//         value INT NOT NULL,
+//         created_at TIMESTAMP DEFAULT NOW()
+//       );
+      
+//       -- Insert default value only if table is empty
+//       INSERT INTO light_intensity (value) 
+//       SELECT 50 WHERE NOT EXISTS (SELECT 1 FROM light_intensity);
+//     `);
+//     console.log('Database initialized');
+//   } catch (err) {
+//     console.error('Database initialization error:', err);
+//   }
+// }
+
 async function initDB() {
   try {
     await pool.query(`
+      CREATE TABLE IF NOT EXISTS device_states (
+        device VARCHAR(50) PRIMARY KEY,
+        state VARCHAR(10) NOT NULL
+      );
+      
       CREATE TABLE IF NOT EXISTS light_intensity (
         id SERIAL PRIMARY KEY,
         value INT NOT NULL,
@@ -29,14 +53,22 @@ async function initDB() {
       -- Insert default value only if table is empty
       INSERT INTO light_intensity (value) 
       SELECT 50 WHERE NOT EXISTS (SELECT 1 FROM light_intensity);
+      
+      -- Insert default device states if they don't exist
+      INSERT INTO device_states (device, state)
+      SELECT 'fan', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'fan');
+      
+      INSERT INTO device_states (device, state)
+      SELECT 'pump', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'pump');
     `);
     console.log('Database initialized');
   } catch (err) {
     console.error('Database initialization error:', err);
+    process.exit(1); // Exit if we can't initialize the database
   }
 }
 
-initDB();
+// initDB();
 
 // Add to server.js (after the device_states table creation)
 // await pool.query(`
@@ -86,6 +118,9 @@ app.post('/api/light-intensity', async (req, res) => {
   }
 });
 
+async function startServer() {
+  try {
+    await initDB();
 
 // Middleware
 app.use(bodyParser.json());
@@ -108,7 +143,6 @@ app.get('/api/device-states', async (req, res) => {
     res.status(500).json({ error: 'Database error' });
   }
 });
-
 
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
@@ -281,3 +315,10 @@ app.post('/api/update-device-state', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
+startServer();
