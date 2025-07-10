@@ -37,6 +37,52 @@ async function initDB() {
 
 initDB();
 
+// Add to server.js (after the device_states table creation)
+await pool.query(`
+  CREATE TABLE IF NOT EXISTS light_intensity (
+    id SERIAL PRIMARY KEY,
+    value INT NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW()
+  );
+  
+  INSERT INTO light_intensity (value) 
+  VALUES (50) 
+  ON CONFLICT DO NOTHING;
+`);
+
+// Add new endpoint to get light intensity
+app.get('/api/light-intensity', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT value FROM light_intensity ORDER BY created_at DESC LIMIT 1'
+    );
+    res.json({ intensity: result.rows[0]?.value || 50 });
+  } catch (err) {
+    console.error('Error fetching light intensity:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Add new endpoint to update light intensity
+app.post('/api/light-intensity', async (req, res) => {
+  const { intensity } = req.body;
+  
+  if (intensity === undefined || intensity < 0 || intensity > 100) {
+    return res.status(400).json({ error: 'Invalid intensity value' });
+  }
+
+  try {
+    await pool.query(
+      'INSERT INTO light_intensity (value) VALUES ($1)',
+      [intensity]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error updating light intensity:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 // Middleware
 app.use(bodyParser.json());
 app.use((req, res, next) => {
@@ -212,7 +258,7 @@ app.get('/api/device-states', (req, res) => {
 app.post('/api/update-device-state', async (req, res) => {
   const { device, state } = req.body;
   
-  if (!['fan', 'plantLight', 'pump'].includes(device)) {
+  if (!['fan', 'pump'].includes(device)) {
     return res.status(400).json({ error: 'Invalid device' });
   }
 
@@ -231,7 +277,3 @@ app.post('/api/update-device-state', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
-
-
-
-
