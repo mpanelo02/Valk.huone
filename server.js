@@ -52,52 +52,33 @@ await pool.query(`
 `);
 
 // Add new endpoint to get light intensity
-// app.get('/api/light-intensity', async (req, res) => {
-//   try {
-//     const result = await pool.query(
-//       'SELECT value FROM light_intensity ORDER BY created_at DESC LIMIT 1'
-//     );
-//     res.json({ intensity: result.rows[0]?.value || 50 });
-//   } catch (err) {
-//     console.error('Error fetching light intensity:', err);
-//     res.status(500).json({ error: 'Database error' });
-//   }
-// });
-
 app.get('/api/light-intensity', async (req, res) => {
   try {
     const result = await pool.query(
       'SELECT value FROM light_intensity ORDER BY created_at DESC LIMIT 1'
     );
-    const intensity = result.rows[0]?.value || 50;
-    console.log('Returning light intensity:', intensity);
-    res.json({ intensity });
+    res.json({ intensity: result.rows[0]?.value || 50 });
   } catch (err) {
     console.error('Error fetching light intensity:', err);
     res.status(500).json({ error: 'Database error' });
   }
 });
 
-// Add new endpoint to update light intensity
-// app.post('/api/light-intensity', async (req, res) => {
-//   const { intensity } = req.body;
-  
-//   if (intensity === undefined || intensity < 0 || intensity > 100) {
-//     return res.status(400).json({ error: 'Invalid intensity value' });
-//   }
-
+// app.get('/api/light-intensity', async (req, res) => {
 //   try {
-//     await pool.query(
-//       'INSERT INTO light_intensity (value) VALUES ($1)',
-//       [intensity]
+//     const result = await pool.query(
+//       'SELECT value FROM light_intensity ORDER BY created_at DESC LIMIT 1'
 //     );
-//     res.json({ success: true });
+//     const intensity = result.rows[0]?.value || 50;
+//     console.log('Returning light intensity:', intensity);
+//     res.json({ intensity });
 //   } catch (err) {
-//     console.error('Error updating light intensity:', err);
+//     console.error('Error fetching light intensity:', err);
 //     res.status(500).json({ error: 'Database error' });
 //   }
 // });
 
+// Add new endpoint to update light intensity
 app.post('/api/light-intensity', async (req, res) => {
   const { intensity } = req.body;
   
@@ -110,13 +91,32 @@ app.post('/api/light-intensity', async (req, res) => {
       'INSERT INTO light_intensity (value) VALUES ($1)',
       [intensity]
     );
-    console.log('Saved new light intensity:', intensity);
     res.json({ success: true });
   } catch (err) {
     console.error('Error updating light intensity:', err);
     res.status(500).json({ error: 'Database error' });
   }
 });
+
+// app.post('/api/light-intensity', async (req, res) => {
+//   const { intensity } = req.body;
+  
+//   if (intensity === undefined || intensity < 0 || intensity > 100) {
+//     return res.status(400).json({ error: 'Invalid intensity value' });
+//   }
+
+//   try {
+//     await pool.query(
+//       'INSERT INTO light_intensity (value) VALUES ($1)',
+//       [intensity]
+//     );
+//     console.log('Saved new light intensity:', intensity);
+//     res.json({ success: true });
+//   } catch (err) {
+//     console.error('Error updating light intensity:', err);
+//     res.status(500).json({ error: 'Database error' });
+//   }
+// });
 
 // Middleware
 app.use(bodyParser.json());
