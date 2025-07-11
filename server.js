@@ -95,6 +95,10 @@ async function initDB() {
       
       INSERT INTO device_states (device, state)
       SELECT 'pump', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'pump');
+
+      -- Insert default automation state if it doesn't exist
+      INSERT INTO device_states (device, state)
+      SELECT 'automation', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'automation');
     `);
     console.log('Database initialized');
   } catch (err) {
@@ -320,6 +324,38 @@ app.get('/api/device-states', (req, res) => {
   res.json(deviceStates);
 });
 
+// app.post('/api/update-device-state', async (req, res) => {
+//   const { device, state } = req.body;
+  
+//   if (!['fan', 'pump', 'automation'].includes(device)) {
+//     return res.status(400).json({ error: 'Invalid device' });
+//   }
+
+//   try {
+//     // Get current state to compare
+//     const current = await pool.query(
+//       'SELECT state FROM device_states WHERE device = $1',
+//       [device]
+//     );
+//     const currentState = current.rows[0]?.state;
+    
+//     // Only log if state changed
+//     if (currentState !== state) {
+//       console.log(`[${new Date().toISOString()}] Device ${device} state changed from ${currentState} to ${state}`);
+//     }
+
+//     await pool.query(
+//       'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
+//       'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
+//       [device, state]
+//     );
+//     res.json({ success: true });
+//   } catch (err) {
+//     console.error('Error updating device state:', err);
+//     res.status(500).json({ error: 'Database error' });
+//   }
+// });
+
 app.post('/api/update-device-state', async (req, res) => {
   const { device, state } = req.body;
   
@@ -338,6 +374,11 @@ app.post('/api/update-device-state', async (req, res) => {
     // Only log if state changed
     if (currentState !== state) {
       console.log(`[${new Date().toISOString()}] Device ${device} state changed from ${currentState} to ${state}`);
+      
+      // If automation is being turned on, start the automation process
+      if (device === 'automation' && state === 'ON') {
+        setupPumpAutomation();
+      }
     }
 
     await pool.query(
@@ -352,16 +393,39 @@ app.post('/api/update-device-state', async (req, res) => {
   }
 });
 
+// async function startServer() {
+//   try {
+//     await initDB();
+    
+//     // Start with automation off by default
+//     await pool.query(
+//       'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
+//       'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
+//       ['automation', 'OFF']
+//     );
+    
+//     app.listen(PORT, () => {
+//       console.log(`Server running on port ${PORT}`);
+//     });
+//   } catch (error) {
+//     console.error('Failed to start server:', error);
+//     process.exit(1);
+//   }
+// }
+
 async function startServer() {
   try {
     await initDB();
     
-    // Start with automation off by default
-    await pool.query(
-      'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
-      'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
-      ['automation', 'OFF']
+    // Check if automation is on and start the automation process if needed
+    const result = await pool.query(
+      'SELECT state FROM device_states WHERE device = $1',
+      ['automation']
     );
+    
+    if (result.rows[0]?.state === 'ON') {
+      setupPumpAutomation();
+    }
     
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
