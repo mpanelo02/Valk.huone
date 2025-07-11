@@ -36,31 +36,22 @@ async function setupPumpAutomation() {
     const currentHour = now.getHours();
     const currentMinutes = now.getMinutes();
     
-    // Determine next trigger time (8 AM or 8 PM Helsinki time)
+    // Determine next trigger time (10:30 AM or 10:30 PM Helsinki time)
     let nextTriggerHour = currentHour < 10 ? 10 : 
-                         currentHour < 22 ? 22 : 10;
+                         (currentHour < 22 || (currentHour === 22 && currentMinutes < 30)) ? 22 : 10;
     
-    // If it's already past 8 PM, schedule for next day 8 AM
-    if (nextTriggerHour === 10 && (currentHour > 10 || (currentHour === 10 && currentMinutes > 0))) {
-      now.setDate(now.getDate() + 1);
+    // Calculate minutes until next trigger
+    let minutesUntilTrigger = (nextTriggerHour - currentHour) * 60 + (30 - currentMinutes);
+    
+    // If it's already past 10:30 PM, schedule for next day 10:30 AM
+    if (minutesUntilTrigger < 0) {
+      minutesUntilTrigger += (24 * 60); // Add 24 hours
     }
     
-    const nextTriggerTime = new Date(
-      now.getFullYear(),
-      now.getMonth(),
-      now.getDate(),
-      nextTriggerHour,
-      0, 0, 0
-    );
-    
-    // Convert Helsinki time to UTC for scheduling
-    const helsinkiOffset = nextTriggerTime.getTimezoneOffset() * 60 * 1000;
-    const utcTriggerTime = new Date(nextTriggerTime.getTime() - helsinkiOffset);
-    
-    const timeUntilTrigger = utcTriggerTime - new Date();
+    const timeUntilTrigger = minutesUntilTrigger * 60 * 1000; // Convert to milliseconds
     
     console.log(`Current Helsinki time: ${now.toISOString()}`);
-    console.log(`Next pump automation scheduled for Helsinki time: ${nextTriggerTime.toISOString()} (in ${Math.round(timeUntilTrigger/1000/60)} minutes)`);
+    console.log(`Next pump automation scheduled for Helsinki time: ${nextTriggerHour}:30 (in ${Math.round(timeUntilTrigger/1000/60)} minutes)`);
     
     setTimeout(async () => {
       // Check again if automation is still ON
@@ -413,14 +404,30 @@ app.get('/api/next-pump-time', async (req, res) => {
       return res.json({ status: 'Automation is OFF' });
     }
     
-    // Calculate next pump time (similar to setupPumpAutomation)
-    // ... calculation code ...
+    // Get current Helsinki time
+    const now = new Date(getHelsinkiTime());
+    const currentHour = now.getHours();
+    const currentMinutes = now.getMinutes();
+    
+    // Determine next trigger time (10:30 AM or 10:30 PM Helsinki time)
+    let nextTriggerHour = currentHour < 10 ? 10 : 
+                         (currentHour < 22 || (currentHour === 22 && currentMinutes < 30)) ? 22 : 10;
+    
+    // Calculate minutes until next trigger
+    let minutesUntilTrigger = (nextTriggerHour - currentHour) * 60 + (30 - currentMinutes);
+    
+    // If it's already past 10:30 PM, schedule for next day 10:30 AM
+    if (minutesUntilTrigger < 0) {
+      minutesUntilTrigger += (24 * 60); // Add 24 hours
+    }
+    
+    const nextTriggerTime = new Date(now.getTime() + minutesUntilTrigger * 60 * 1000);
     
     res.json({
       status: 'Automation is ON',
       nextPumpTime: nextTriggerTime.toISOString(),
       nextPumpTimeLocal: nextTriggerTime.toLocaleString("fi-FI", {timeZone: "Europe/Helsinki"}),
-      inMinutes: Math.round(timeUntilTrigger/1000/60)
+      inMinutes: minutesUntilTrigger
     });
   } catch (err) {
     res.status(500).json({ error: 'Database error' });
