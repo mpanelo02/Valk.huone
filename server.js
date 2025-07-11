@@ -39,6 +39,7 @@ async function setupPumpAutomation() {
   const timeUntilTrigger = nextTriggerTime - new Date();
   
   setTimeout(async () => {
+    console.log(`[${new Date().toISOString()}] AUTOMATION: Turning pump ON (scheduled)`);
     // Turn pump ON
     await pool.query(
       'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
@@ -50,6 +51,7 @@ async function setupPumpAutomation() {
     
     // Turn pump OFF after 1 minute
     setTimeout(async () => {
+      console.log(`[${new Date().toISOString()}] AUTOMATION: Turning pump OFF after 1 minute`);
       await pool.query(
         'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
         'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
@@ -125,6 +127,24 @@ app.get('/api/light-intensity', async (req, res) => {
 
 
 
+// app.post('/api/light-intensity', async (req, res) => {
+//   const { intensity } = req.body;
+  
+//   if (intensity === undefined || intensity < 0 || intensity > 100) {
+//     return res.status(400).json({ error: 'Invalid intensity value' });
+//   }
+
+//   try {
+//     await pool.query(
+//       'INSERT INTO light_intensity (value) VALUES ($1)',
+//       [intensity]
+//     );
+//     res.json({ success: true });
+//   } catch (err) {
+//     console.error('Error updating light intensity:', err);
+//     res.status(500).json({ error: 'Database error' });
+//   }
+// });
 app.post('/api/light-intensity', async (req, res) => {
   const { intensity } = req.body;
   
@@ -133,6 +153,17 @@ app.post('/api/light-intensity', async (req, res) => {
   }
 
   try {
+    // Get current intensity to compare
+    const current = await pool.query(
+      'SELECT value FROM light_intensity ORDER BY created_at DESC LIMIT 1'
+    );
+    const currentIntensity = current.rows[0]?.value;
+    
+    // Only log if value changed
+    if (currentIntensity !== intensity) {
+      console.log(`[${new Date().toISOString()}] Light intensity changed from ${currentIntensity} to ${intensity}`);
+    }
+
     await pool.query(
       'INSERT INTO light_intensity (value) VALUES ($1)',
       [intensity]
@@ -327,6 +358,33 @@ app.get('/api/device-states', (req, res) => {
 //   }
 // });
 
+// app.post('/api/update-device-state', async (req, res) => {
+//   const { device, state } = req.body;
+  
+//   if (!['fan', 'pump', 'automation'].includes(device)) {
+//     return res.status(400).json({ error: 'Invalid device' });
+//   }
+
+//   try {
+//     if (device === 'automation') {
+//       // Handle automation toggle
+//       if (state === 'ON') {
+//         await setupPumpAutomation();
+//       }
+//       // You might want to add logic to cancel automation if state === 'OFF'
+//     } else {
+//       // Normal device state update
+//       await pool.query(
+//         'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
+//         'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
+//         [device, state]
+//       );
+//     }
+//     res.json({ success: true });
+//   } catch (err) {
+//     res.status(500).json({ error: 'Database error' });
+//   }
+// });
 app.post('/api/update-device-state', async (req, res) => {
   const { device, state } = req.body;
   
@@ -335,22 +393,26 @@ app.post('/api/update-device-state', async (req, res) => {
   }
 
   try {
-    if (device === 'automation') {
-      // Handle automation toggle
-      if (state === 'ON') {
-        await setupPumpAutomation();
-      }
-      // You might want to add logic to cancel automation if state === 'OFF'
-    } else {
-      // Normal device state update
-      await pool.query(
-        'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
-        'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
-        [device, state]
-      );
+    // Get current state to compare
+    const current = await pool.query(
+      'SELECT state FROM device_states WHERE device = $1',
+      [device]
+    );
+    const currentState = current.rows[0]?.state;
+    
+    // Only log if state changed
+    if (currentState !== state) {
+      console.log(`[${new Date().toISOString()}] Device ${device} state changed from ${currentState} to ${state}`);
     }
+
+    await pool.query(
+      'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
+      'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
+      [device, state]
+    );
     res.json({ success: true });
   } catch (err) {
+    console.error('Error updating device state:', err);
     res.status(500).json({ error: 'Database error' });
   }
 });
