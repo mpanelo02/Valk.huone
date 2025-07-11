@@ -126,25 +126,6 @@ app.get('/api/light-intensity', async (req, res) => {
 });
 
 
-
-// app.post('/api/light-intensity', async (req, res) => {
-//   const { intensity } = req.body;
-  
-//   if (intensity === undefined || intensity < 0 || intensity > 100) {
-//     return res.status(400).json({ error: 'Invalid intensity value' });
-//   }
-
-//   try {
-//     await pool.query(
-//       'INSERT INTO light_intensity (value) VALUES ($1)',
-//       [intensity]
-//     );
-//     res.json({ success: true });
-//   } catch (err) {
-//     console.error('Error updating light intensity:', err);
-//     res.status(500).json({ error: 'Database error' });
-//   }
-// });
 app.post('/api/light-intensity', async (req, res) => {
   const { intensity } = req.body;
   
@@ -339,52 +320,6 @@ app.get('/api/device-states', (req, res) => {
   res.json(deviceStates);
 });
 
-// app.post('/api/update-device-state', async (req, res) => {
-//   const { device, state } = req.body;
-  
-//   if (!['fan', 'pump'].includes(device)) {
-//     return res.status(400).json({ error: 'Invalid device' });
-//   }
-
-//   try {
-//     await pool.query(
-//       'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
-//       'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
-//       [device, state]
-//     );
-//     res.json({ success: true });
-//   } catch (err) {
-//     res.status(500).json({ error: 'Database error' });
-//   }
-// });
-
-// app.post('/api/update-device-state', async (req, res) => {
-//   const { device, state } = req.body;
-  
-//   if (!['fan', 'pump', 'automation'].includes(device)) {
-//     return res.status(400).json({ error: 'Invalid device' });
-//   }
-
-//   try {
-//     if (device === 'automation') {
-//       // Handle automation toggle
-//       if (state === 'ON') {
-//         await setupPumpAutomation();
-//       }
-//       // You might want to add logic to cancel automation if state === 'OFF'
-//     } else {
-//       // Normal device state update
-//       await pool.query(
-//         'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
-//         'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
-//         [device, state]
-//       );
-//     }
-//     res.json({ success: true });
-//   } catch (err) {
-//     res.status(500).json({ error: 'Database error' });
-//   }
-// });
 app.post('/api/update-device-state', async (req, res) => {
   const { device, state } = req.body;
   
@@ -417,18 +352,6 @@ app.post('/api/update-device-state', async (req, res) => {
   }
 });
 
-// async function startServer() {
-//   try {
-//     await initDB();
-
-// app.listen(PORT, () => {
-//   console.log(`Server running on port ${PORT}`);
-// });
-//   } catch (error) {
-//     console.error('Failed to start server:', error);
-//     process.exit(1);
-//   }
-// }
 async function startServer() {
   try {
     await initDB();
