@@ -10,6 +10,59 @@ const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.ARANET_API_KEY;
 const SIGROW_API_KEY = process.env.SIGROW_API_KEY; // Consider moving this to environment variables too
 
+const AUTOMATION_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours in ms
+const PUMP_DURATION = 60 * 1000; // 1 minute in ms
+
+async function setupPumpAutomation() {
+  // Calculate time until next 6 AM or 6 PM
+  const now = new Date();
+  const currentHour = now.getHours();
+  
+  // Determine next trigger time (6 AM or 6 PM)
+  let nextTriggerHour = currentHour < 6 ? 6 : 
+                       currentHour < 18 ? 18 : 6;
+  
+  // If it's already past 6 PM, schedule for next day 6 AM
+  if (nextTriggerHour === 6 && currentHour >= 6) {
+    nextTriggerHour = 6;
+    now.setDate(now.getDate() + 1);
+  }
+  
+  const nextTriggerTime = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    nextTriggerHour,
+    0, 0, 0
+  );
+  
+  const timeUntilTrigger = nextTriggerTime - new Date();
+  
+  setTimeout(async () => {
+    // Turn pump ON
+    await pool.query(
+      'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
+      'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
+      ['pump', 'ON']
+    );
+    
+    console.log(`Pump turned ON at ${new Date().toISOString()}`);
+    
+    // Turn pump OFF after 1 minute
+    setTimeout(async () => {
+      await pool.query(
+        'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
+        'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
+        ['pump', 'OFF']
+      );
+      console.log(`Pump turned OFF at ${new Date().toISOString()}`);
+      
+      // Schedule next automation cycle
+      setupPumpAutomation();
+    }, PUMP_DURATION);
+  }, timeUntilTrigger);
+}
+
 // PostgreSQL connection
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL || 'postgresql://valk_huone_1_user:yuHDs6SGhVjdkP2XbL16zbFhbL1OWsFr@dpg-d1ki9i3e5dus73ejpdpg-a/valk_huone_1',
@@ -255,32 +308,79 @@ app.get('/api/device-states', (req, res) => {
   res.json(deviceStates);
 });
 
+// app.post('/api/update-device-state', async (req, res) => {
+//   const { device, state } = req.body;
+  
+//   if (!['fan', 'pump'].includes(device)) {
+//     return res.status(400).json({ error: 'Invalid device' });
+//   }
+
+//   try {
+//     await pool.query(
+//       'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
+//       'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
+//       [device, state]
+//     );
+//     res.json({ success: true });
+//   } catch (err) {
+//     res.status(500).json({ error: 'Database error' });
+//   }
+// });
+
 app.post('/api/update-device-state', async (req, res) => {
   const { device, state } = req.body;
   
-  if (!['fan', 'pump'].includes(device)) {
+  if (!['fan', 'pump', 'automation'].includes(device)) {
     return res.status(400).json({ error: 'Invalid device' });
   }
 
   try {
-    await pool.query(
-      'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
-      'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
-      [device, state]
-    );
+    if (device === 'automation') {
+      // Handle automation toggle
+      if (state === 'ON') {
+        await setupPumpAutomation();
+      }
+      // You might want to add logic to cancel automation if state === 'OFF'
+    } else {
+      // Normal device state update
+      await pool.query(
+        'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
+        'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
+        [device, state]
+      );
+    }
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Database error' });
   }
 });
 
+// async function startServer() {
+//   try {
+//     await initDB();
+
+// app.listen(PORT, () => {
+//   console.log(`Server running on port ${PORT}`);
+// });
+//   } catch (error) {
+//     console.error('Failed to start server:', error);
+//     process.exit(1);
+//   }
+// }
 async function startServer() {
   try {
     await initDB();
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+    
+    // Start with automation off by default
+    await pool.query(
+      'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
+      'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
+      ['automation', 'OFF']
+    );
+    
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);
