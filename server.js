@@ -13,56 +13,137 @@ const SIGROW_API_KEY = process.env.SIGROW_API_KEY; // Consider moving this to en
 const AUTOMATION_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours in ms
 const PUMP_DURATION = 60 * 1000; // 1 minute in ms
 
+// async function setupPumpAutomation() {
+//   // Calculate time until next 6 AM or 6 PM
+//   const now = new Date();
+//   const currentHour = now.getHours();
+  
+//   // Determine next trigger time (6 AM or 6 PM)
+//   let nextTriggerHour = currentHour < 6 ? 6 : 
+//                        currentHour < 18 ? 18 : 6;
+  
+//   // If it's already past 6 PM, schedule for next day 6 AM
+//   if (nextTriggerHour === 6 && currentHour >= 6) {
+//     nextTriggerHour = 6;
+//     now.setDate(now.getDate() + 1);
+//   }
+  
+//   const nextTriggerTime = new Date(
+//     now.getFullYear(),
+//     now.getMonth(),
+//     now.getDate(),
+//     nextTriggerHour,
+//     0, 0, 0
+//   );
+  
+//   const timeUntilTrigger = nextTriggerTime - new Date();
+  
+//   setTimeout(async () => {
+//     console.log(`[${new Date().toISOString()}] AUTOMATION: Turning pump ON (scheduled)`);
+//     // Turn pump ON
+//     await pool.query(
+//       'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
+//       'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
+//       ['pump', 'ON']
+//     );
+    
+//     console.log(`Pump turned ON at ${new Date().toISOString()}`);
+    
+//     // Turn pump OFF after 1 minute
+//     setTimeout(async () => {
+//       console.log(`[${new Date().toISOString()}] AUTOMATION: Turning pump OFF after 1 minute`);
+//       await pool.query(
+//         'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
+//         'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
+//         ['pump', 'OFF']
+//       );
+//       console.log(`Pump turned OFF at ${new Date().toISOString()}`);
+      
+//       // Schedule next automation cycle
+//       setupPumpAutomation();
+//     }, PUMP_DURATION);
+//   }, timeUntilTrigger);
+// }
+// Update the setupPumpAutomation function
 async function setupPumpAutomation() {
-  // Calculate time until next 6 AM or 6 PM
-  const now = new Date();
-  const currentHour = now.getHours();
-  
-  // Determine next trigger time (6 AM or 6 PM)
-  let nextTriggerHour = currentHour < 6 ? 6 : 
-                       currentHour < 18 ? 18 : 6;
-  
-  // If it's already past 6 PM, schedule for next day 6 AM
-  if (nextTriggerHour === 6 && currentHour >= 6) {
-    nextTriggerHour = 6;
-    now.setDate(now.getDate() + 1);
-  }
-  
-  const nextTriggerTime = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-    nextTriggerHour,
-    0, 0, 0
-  );
-  
-  const timeUntilTrigger = nextTriggerTime - new Date();
-  
-  setTimeout(async () => {
-    console.log(`[${new Date().toISOString()}] AUTOMATION: Turning pump ON (scheduled)`);
-    // Turn pump ON
-    await pool.query(
-      'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
-      'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
-      ['pump', 'ON']
+  try {
+    // First check if automation is still ON
+    const result = await pool.query(
+      'SELECT state FROM device_states WHERE device = $1',
+      ['automation']
     );
     
-    console.log(`Pump turned ON at ${new Date().toISOString()}`);
+    if (result.rows[0]?.state !== 'ON') {
+      console.log('Automation is OFF - stopping scheduled pump automation');
+      return;
+    }
+
+    // Calculate time until next 7 AM or 7 PM
+    const now = new Date();
+    const currentHour = now.getHours();
     
-    // Turn pump OFF after 1 minute
+    // Determine next trigger time (7 AM or 7 PM)
+    let nextTriggerHour = currentHour < 7 ? 7 : 
+                         currentHour < 19 ? 19 : 7;
+    
+    // If it's already past 7 PM, schedule for next day 7 AM
+    if (nextTriggerHour === 7 && currentHour >= 7) {
+      now.setDate(now.getDate() + 1);
+    }
+    
+    const nextTriggerTime = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      nextTriggerHour,
+      0, 0, 0
+    );
+    
+    const timeUntilTrigger = nextTriggerTime - now;
+    
+    console.log(`Next pump automation scheduled for ${nextTriggerTime.toISOString()} (in ${Math.round(timeUntilTrigger/1000/60)} minutes)`);
+    
     setTimeout(async () => {
-      console.log(`[${new Date().toISOString()}] AUTOMATION: Turning pump OFF after 1 minute`);
+      // Check again if automation is still ON
+      const checkResult = await pool.query(
+        'SELECT state FROM device_states WHERE device = $1',
+        ['automation']
+      );
+      
+      if (checkResult.rows[0]?.state !== 'ON') {
+        console.log('Automation was turned OFF - cancelling pump activation');
+        return;
+      }
+
+      console.log(`[${new Date().toISOString()}] AUTOMATION: Turning pump ON (scheduled)`);
+      // Turn pump ON
       await pool.query(
         'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
         'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
-        ['pump', 'OFF']
+        ['pump', 'ON']
       );
-      console.log(`Pump turned OFF at ${new Date().toISOString()}`);
       
-      // Schedule next automation cycle
-      setupPumpAutomation();
-    }, PUMP_DURATION);
-  }, timeUntilTrigger);
+      console.log(`Pump turned ON at ${new Date().toISOString()}`);
+      
+      // Turn pump OFF after 1 minute
+      setTimeout(async () => {
+        console.log(`[${new Date().toISOString()}] AUTOMATION: Turning pump OFF after 1 minute`);
+        await pool.query(
+          'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
+          'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
+          ['pump', 'OFF']
+        );
+        console.log(`Pump turned OFF at ${new Date().toISOString()}`);
+        
+        // Schedule next automation cycle
+        setupPumpAutomation();
+      }, PUMP_DURATION);
+    }, timeUntilTrigger);
+  } catch (err) {
+    console.error('Error in pump automation:', err);
+    // Retry after 5 minutes if there was an error
+    setTimeout(setupPumpAutomation, 5 * 60 * 1000);
+  }
 }
 
 // PostgreSQL connection
@@ -324,6 +405,7 @@ app.get('/api/device-states', (req, res) => {
   res.json(deviceStates);
 });
 
+
 // app.post('/api/update-device-state', async (req, res) => {
 //   const { device, state } = req.body;
   
@@ -342,6 +424,11 @@ app.get('/api/device-states', (req, res) => {
 //     // Only log if state changed
 //     if (currentState !== state) {
 //       console.log(`[${new Date().toISOString()}] Device ${device} state changed from ${currentState} to ${state}`);
+      
+//       // If automation is being turned on, start the automation process
+//       if (device === 'automation' && state === 'ON') {
+//         setupPumpAutomation();
+//       }
 //     }
 
 //     await pool.query(
@@ -397,12 +484,15 @@ app.post('/api/update-device-state', async (req, res) => {
 //   try {
 //     await initDB();
     
-//     // Start with automation off by default
-//     await pool.query(
-//       'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
-//       'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
-//       ['automation', 'OFF']
+//     // Check if automation is on and start the automation process if needed
+//     const result = await pool.query(
+//       'SELECT state FROM device_states WHERE device = $1',
+//       ['automation']
 //     );
+    
+//     if (result.rows[0]?.state === 'ON') {
+//       setupPumpAutomation();
+//     }
     
 //     app.listen(PORT, () => {
 //       console.log(`Server running on port ${PORT}`);
@@ -424,7 +514,10 @@ async function startServer() {
     );
     
     if (result.rows[0]?.state === 'ON') {
+      console.log('Automation is ON - starting pump automation schedule');
       setupPumpAutomation();
+    } else {
+      console.log('Automation is OFF - no scheduled pump automation');
     }
     
     app.listen(PORT, () => {
