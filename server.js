@@ -37,11 +37,11 @@ async function setupPumpAutomation() {
     const currentMinutes = now.getMinutes();
     
     // Determine next trigger time (8 AM or 8 PM Helsinki time)
-    let nextTriggerHour = currentHour < 9 ? 9 : 
-                         currentHour < 21 ? 21 : 9;
+    let nextTriggerHour = currentHour < 10 ? 10 : 
+                         currentHour < 22 ? 22 : 10;
     
     // If it's already past 8 PM, schedule for next day 8 AM
-    if (nextTriggerHour === 9 && (currentHour > 9 || (currentHour === 9 && currentMinutes > 0))) {
+    if (nextTriggerHour === 10 && (currentHour > 10 || (currentHour === 10 && currentMinutes > 0))) {
       now.setDate(now.getDate() + 1);
     }
     
@@ -438,7 +438,7 @@ async function startServer() {
     );
     
     if (result.rows[0]?.state === 'ON') {
-      console.log('Automation is ON - starting pump automation schedule for Helsinki time (9 AM/PM)');
+      console.log('Automation is ON - starting pump automation schedule for Helsinki time (10 AM/PM)');
       setupPumpAutomation();
     } else {
       console.log('Automation is OFF - no scheduled pump automation');
