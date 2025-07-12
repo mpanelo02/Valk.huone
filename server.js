@@ -10,11 +10,51 @@ const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.ARANET_API_KEY;
 const SIGROW_API_KEY = process.env.SIGROW_API_KEY; // Consider moving this to environment variables too
 
+function logDeviceStateChange(device, state) {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] Device state changed - Device: ${device}, State: ${state}`);
+}
+
 // PostgreSQL connection
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL || 'postgresql://valk_huone_1_user:yuHDs6SGhVjdkP2XbL16zbFhbL1OWsFr@dpg-d1ki9i3e5dus73ejpdpg-a/valk_huone_1',
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
+
+// async function initDB() {
+//   try {
+//     await pool.query(`
+//       CREATE TABLE IF NOT EXISTS device_states (
+//         device VARCHAR(50) PRIMARY KEY,
+//         state VARCHAR(10) NOT NULL
+//       );
+      
+//       CREATE TABLE IF NOT EXISTS light_intensity (
+//         id SERIAL PRIMARY KEY,
+//         value INT NOT NULL,
+//         created_at TIMESTAMP DEFAULT NOW()
+//       );
+      
+//       -- Insert default value only if table is empty
+//       INSERT INTO light_intensity (value) 
+//       SELECT 50 WHERE NOT EXISTS (SELECT 1 FROM light_intensity);
+      
+//       -- Insert default device states if they don't exist
+//       INSERT INTO device_states (device, state)
+//       SELECT 'fan', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'fan');
+      
+//       INSERT INTO device_states (device, state)
+//       SELECT 'pump', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'pump');
+
+//       INSERT INTO device_states (device, state)
+//       SELECT 'autobot', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'autobot');
+//     `);
+//     console.log('Database initialized');
+//   } catch (err) {
+//     console.error('Database initialization error:', err);
+//     process.exit(1); // Exit if we can't initialize the database
+//   }
+// }
 
 async function initDB() {
   try {
@@ -29,25 +69,47 @@ async function initDB() {
         value INT NOT NULL,
         created_at TIMESTAMP DEFAULT NOW()
       );
-      
-      -- Insert default value only if table is empty
-      INSERT INTO light_intensity (value) 
-      SELECT 50 WHERE NOT EXISTS (SELECT 1 FROM light_intensity);
-      
-      -- Insert default device states if they don't exist
-      INSERT INTO device_states (device, state)
-      SELECT 'fan', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'fan');
-      
-      INSERT INTO device_states (device, state)
-      SELECT 'pump', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'pump');
-
-      INSERT INTO device_states (device, state)
-      SELECT 'autobot', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'autobot');
     `);
+    
+    // Insert default values and log them
+    const initResults = await Promise.all([
+      pool.query(`
+        INSERT INTO light_intensity (value) 
+        SELECT 50 WHERE NOT EXISTS (SELECT 1 FROM light_intensity)
+        RETURNING value
+      `),
+      
+      pool.query(`
+        INSERT INTO device_states (device, state)
+        SELECT 'fan', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'fan')
+        RETURNING device, state
+      `),
+      
+      pool.query(`
+        INSERT INTO device_states (device, state)
+        SELECT 'pump', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'pump')
+        RETURNING device, state
+      `),
+      
+      pool.query(`
+        INSERT INTO device_states (device, state)
+        SELECT 'autobot', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'autobot')
+        RETURNING device, state
+      `)
+    ]);
+    
+    // Log initialized states
+    initResults.slice(1).forEach(result => {
+      if (result.rows.length > 0) {
+        const row = result.rows[0];
+        logDeviceStateChange(row.device, row.state);
+      }
+    });
+    
     console.log('Database initialized');
   } catch (err) {
     console.error('Database initialization error:', err);
-    process.exit(1); // Exit if we can't initialize the database
+    process.exit(1);
   }
 }
 
@@ -258,6 +320,24 @@ app.get('/api/device-states', (req, res) => {
   res.json(deviceStates);
 });
 
+// app.post('/api/update-device-state', async (req, res) => {
+//   const { device, state } = req.body;
+  
+//   if (!['fan', 'pump', 'autobot'].includes(device)) {
+//     return res.status(400).json({ error: 'Invalid device' });
+//   }
+
+//   try {
+//     await pool.query(
+//       'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
+//       'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
+//       [device, state]
+//     );
+//     res.json({ success: true });
+//   } catch (err) {
+//     res.status(500).json({ error: 'Database error' });
+//   }
+// });
 app.post('/api/update-device-state', async (req, res) => {
   const { device, state } = req.body;
   
@@ -266,13 +346,28 @@ app.post('/api/update-device-state', async (req, res) => {
   }
 
   try {
+    // First get the current state for comparison
+    const currentState = await pool.query(
+      'SELECT state FROM device_states WHERE device = $1',
+      [device]
+    );
+    
+    const previousState = currentState.rows[0]?.state || 'UNKNOWN';
+    
     await pool.query(
       'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
       'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
       [device, state]
     );
+    
+    // Log the change if it's different
+    if (previousState !== state) {
+      logDeviceStateChange(device, state);
+    }
+    
     res.json({ success: true });
   } catch (err) {
+    console.error('Database error:', err);
     res.status(500).json({ error: 'Database error' });
   }
 });
