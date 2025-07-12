@@ -40,6 +40,9 @@ async function initDB() {
       
       INSERT INTO device_states (device, state)
       SELECT 'pump', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'pump');
+
+      INSERT INTO device_states (device, state)
+      SELECT 'automation', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'automation');
     `);
     console.log('Database initialized');
   } catch (err) {
@@ -268,6 +271,22 @@ app.post('/api/update-device-state', async (req, res) => {
       'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
       [device, state]
     );
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/api/toggle-automation', async (req, res) => {
+  try {
+    const { state } = req.body;
+    
+    await pool.query(
+      'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
+      'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
+      ['automation', state]
+    );
+    
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: 'Database error' });
