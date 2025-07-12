@@ -10,29 +10,29 @@ const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.ARANET_API_KEY;
 const SIGROW_API_KEY = process.env.SIGROW_API_KEY; // Consider moving this to environment variables too
 
-const LOG_PREFIX = '[FarmLab]';
+// const LOG_PREFIX = '[FarmLab]';
 
-// function logDeviceStateChange(device, state) {
-//   const timestamp = new Date().toISOString();
-//   console.log(`[${timestamp}] Device state changed - Device: ${device}, State: ${state}`);
-// }
+function logDeviceStateChange(device, state) {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}] Device state changed - Device: ${device}, State: ${state}`);
+}
 
 // Enhanced logging function
-function logDeviceState(device, previousState, newState, source = 'API') {
-  const timestamp = new Date().toISOString();
-  console.log(`${LOG_PREFIX} [${timestamp}] [${source}] ${device}: ${previousState} → ${newState}`);
+// function logDeviceState(device, previousState, newState, source = 'API') {
+//   const timestamp = new Date().toISOString();
+//   console.log(`${LOG_PREFIX} [${timestamp}] [${source}] ${device}: ${previousState} → ${newState}`);
   
-  // For Render.com's log system, it's good to include JSON format too
-  console.log(JSON.stringify({
-    level: 'info',
-    timestamp,
-    device,
-    previousState,
-    newState,
-    source,
-    message: `Device state changed: ${device} from ${previousState} to ${newState}`
-  }));
-}
+//   // For Render.com's log system, it's good to include JSON format too
+//   console.log(JSON.stringify({
+//     level: 'info',
+//     timestamp,
+//     device,
+//     previousState,
+//     newState,
+//     source,
+//     message: `Device state changed: ${device} from ${previousState} to ${newState}`
+//   }));
+// }
 
 // PostgreSQL connection
 const pool = new Pool({
@@ -358,51 +358,15 @@ app.get('/api/device-states', (req, res) => {
 //   }
 // });
 
-// app.post('/api/update-device-state', async (req, res) => {
-//   const { device, state } = req.body;
-  
-//   if (!['fan', 'pump', 'autobot'].includes(device)) {
-//     return res.status(400).json({ error: 'Invalid device' });
-//   }
-
-//   try {
-//     // First get the current state for comparison
-//     const currentState = await pool.query(
-//       'SELECT state FROM device_states WHERE device = $1',
-//       [device]
-//     );
-    
-//     const previousState = currentState.rows[0]?.state || 'UNKNOWN';
-    
-//     await pool.query(
-//       'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
-//       'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
-//       [device, state]
-//     );
-    
-//     // Log the change if it's different
-//     if (previousState !== state) {
-//       logDeviceStateChange(device, state);
-//     }
-    
-//     res.json({ success: true });
-//   } catch (err) {
-//     console.error('Database error:', err);
-//     res.status(500).json({ error: 'Database error' });
-//   }
-// });
-
 app.post('/api/update-device-state', async (req, res) => {
   const { device, state } = req.body;
   
   if (!['fan', 'pump', 'autobot'].includes(device)) {
-    const errorMsg = `${LOG_PREFIX} Invalid device: ${device}`;
-    console.error(errorMsg);
     return res.status(400).json({ error: 'Invalid device' });
   }
 
   try {
-    // Get current state
+    // First get the current state for comparison
     const currentState = await pool.query(
       'SELECT state FROM device_states WHERE device = $1',
       [device]
@@ -410,24 +374,60 @@ app.post('/api/update-device-state', async (req, res) => {
     
     const previousState = currentState.rows[0]?.state || 'UNKNOWN';
     
-    // Only update and log if state is changing
+    await pool.query(
+      'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
+      'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
+      [device, state]
+    );
+    
+    // Log the change if it's different
     if (previousState !== state) {
-      await pool.query(
-        'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
-        'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
-        [device, state]
-      );
-      
-      logDeviceState(device, previousState, state, req.ip || 'unknown');
+      logDeviceStateChange(device, state);
     }
     
     res.json({ success: true });
   } catch (err) {
-    const errorMsg = `${LOG_PREFIX} DB Error on ${device} update: ${err.message}`;
-    console.error(errorMsg);
+    console.error('Database error:', err);
     res.status(500).json({ error: 'Database error' });
   }
 });
+
+// app.post('/api/update-device-state', async (req, res) => {
+//   const { device, state } = req.body;
+  
+//   if (!['fan', 'pump', 'autobot'].includes(device)) {
+//     const errorMsg = `${LOG_PREFIX} Invalid device: ${device}`;
+//     console.error(errorMsg);
+//     return res.status(400).json({ error: 'Invalid device' });
+//   }
+
+//   try {
+//     // Get current state
+//     const currentState = await pool.query(
+//       'SELECT state FROM device_states WHERE device = $1',
+//       [device]
+//     );
+    
+//     const previousState = currentState.rows[0]?.state || 'UNKNOWN';
+    
+//     // Only update and log if state is changing
+//     if (previousState !== state) {
+//       await pool.query(
+//         'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
+//         'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
+//         [device, state]
+//       );
+      
+//       logDeviceState(device, previousState, state, req.ip || 'unknown');
+//     }
+    
+//     res.json({ success: true });
+//   } catch (err) {
+//     const errorMsg = `${LOG_PREFIX} DB Error on ${device} update: ${err.message}`;
+//     console.error(errorMsg);
+//     res.status(500).json({ error: 'Database error' });
+//   }
+// });
 
 async function startServer() {
   try {
