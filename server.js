@@ -40,9 +40,6 @@ async function initDB() {
       
       INSERT INTO device_states (device, state)
       SELECT 'pump', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'pump');
-
-      INSERT INTO device_states (device, state)
-      SELECT 'automation', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'automation');
     `);
     console.log('Database initialized');
   } catch (err) {
@@ -251,8 +248,7 @@ app.get('/api/data', async (req, res) => {
 let deviceStates = {
   fan: "OFF",
   plantLight: "OFF",
-  pump: "OFF",
-  automation: "OFF"
+  pump: "OFF"
 };
 
 app.get('/api/device-states', (req, res) => {
