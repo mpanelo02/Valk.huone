@@ -42,7 +42,7 @@ async function initDB() {
       SELECT 'pump', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'pump');
 
       INSERT INTO device_states (device, state)
-      SELECT 'automated', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'automated');
+      SELECT 'autobot', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'autobot');
     `);
     console.log('Database initialized');
   } catch (err) {
@@ -250,9 +250,8 @@ app.get('/api/data', async (req, res) => {
 
 let deviceStates = {
   fan: "OFF",
-  // plantLight: "OFF",
-  pump: "OFF",
-  automated: "OFF"
+  plantLight: "OFF",
+  pump: "OFF"
 };
 
 app.get('/api/device-states', (req, res) => {
@@ -262,7 +261,7 @@ app.get('/api/device-states', (req, res) => {
 app.post('/api/update-device-state', async (req, res) => {
   const { device, state } = req.body;
   
-  if (!['fan', 'pump'].includes(device)) {
+  if (!['fan', 'pump', 'autobot'].includes(device)) {
     return res.status(400).json({ error: 'Invalid device' });
   }
 
