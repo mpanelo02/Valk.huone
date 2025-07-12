@@ -10,92 +10,6 @@ const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.ARANET_API_KEY;
 const SIGROW_API_KEY = process.env.SIGROW_API_KEY; // Consider moving this to environment variables too
 
-const AUTOMATION_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours in ms
-const PUMP_DURATION = 60 * 1000; // 1 minute in ms
-
-// Helper function to get Helsinki time
-function getHelsinkiTime() {
-  return new Date().toLocaleString("en-US", { timeZone: "Europe/Helsinki" });
-}
-
-async function setupPumpAutomation() {
-  try {
-    // First check if automation is still ON
-    const result = await pool.query(
-      'SELECT state FROM device_states WHERE device = $1',
-      ['automation']
-    );
-    
-    if (result.rows[0]?.state !== 'ON') {
-      console.log('Automation is OFF - stopping scheduled pump automation');
-      return;
-    }
-
-    // Get current Helsinki time
-    const now = new Date(getHelsinkiTime());
-    const currentHour = now.getHours();
-    const currentMinutes = now.getMinutes();
-    
-    // Determine next trigger time (10:30 AM or 10:30 PM Helsinki time)
-    let nextTriggerHour = currentHour < 10 ? 10 : 
-                         (currentHour < 22 || (currentHour === 22 && currentMinutes < 30)) ? 22 : 10;
-    
-    // Calculate minutes until next trigger
-    let minutesUntilTrigger = (nextTriggerHour - currentHour) * 60 + (30 - currentMinutes);
-    
-    // If it's already past 10:30 PM, schedule for next day 10:30 AM
-    if (minutesUntilTrigger < 0) {
-      minutesUntilTrigger += (24 * 60); // Add 24 hours
-    }
-    
-    const timeUntilTrigger = minutesUntilTrigger * 60 * 1000; // Convert to milliseconds
-    
-    console.log(`Current Helsinki time: ${now.toISOString()}`);
-    console.log(`Next pump automation scheduled for Helsinki time: ${nextTriggerHour}:30 (in ${Math.round(timeUntilTrigger/1000/60)} minutes)`);
-    
-    setTimeout(async () => {
-      // Check again if automation is still ON
-      const checkResult = await pool.query(
-        'SELECT state FROM device_states WHERE device = $1',
-        ['automation']
-      );
-      
-      if (checkResult.rows[0]?.state !== 'ON') {
-        console.log('Automation was turned OFF - cancelling pump activation');
-        return;
-      }
-
-      console.log(`[${new Date().toISOString()}] AUTOMATION: Turning pump ON (scheduled)`);
-      // Turn pump ON
-      await pool.query(
-        'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
-        'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
-        ['pump', 'ON']
-      );
-      
-      console.log(`Pump turned ON at ${new Date().toISOString()}`);
-      
-      // Turn pump OFF after 1 minute
-      setTimeout(async () => {
-        console.log(`[${new Date().toISOString()}] AUTOMATION: Turning pump OFF after 1 minute`);
-        await pool.query(
-          'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
-          'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
-          ['pump', 'OFF']
-        );
-        console.log(`Pump turned OFF at ${new Date().toISOString()}`);
-        
-        // Schedule next automation cycle
-        setupPumpAutomation();
-      }, PUMP_DURATION);
-    }, timeUntilTrigger);
-  } catch (err) {
-    console.error('Error in pump automation:', err);
-    // Retry after 5 minutes if there was an error
-    setTimeout(setupPumpAutomation, 5 * 60 * 1000);
-  }
-}
-
 // PostgreSQL connection
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL || 'postgresql://valk_huone_1_user:yuHDs6SGhVjdkP2XbL16zbFhbL1OWsFr@dpg-d1ki9i3e5dus73ejpdpg-a/valk_huone_1',
@@ -127,7 +41,6 @@ async function initDB() {
       INSERT INTO device_states (device, state)
       SELECT 'pump', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'pump');
 
-      -- Insert default automation state if it doesn't exist
       INSERT INTO device_states (device, state)
       SELECT 'automation', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'automation');
     `);
@@ -161,6 +74,7 @@ app.get('/api/light-intensity', async (req, res) => {
 });
 
 
+
 app.post('/api/light-intensity', async (req, res) => {
   const { intensity } = req.body;
   
@@ -169,17 +83,6 @@ app.post('/api/light-intensity', async (req, res) => {
   }
 
   try {
-    // Get current intensity to compare
-    const current = await pool.query(
-      'SELECT value FROM light_intensity ORDER BY created_at DESC LIMIT 1'
-    );
-    const currentIntensity = current.rows[0]?.value;
-    
-    // Only log if value changed
-    if (currentIntensity !== intensity) {
-      console.log(`[${new Date().toISOString()}] Light intensity changed from ${currentIntensity} to ${intensity}`);
-    }
-
     await pool.query(
       'INSERT INTO light_intensity (value) VALUES ($1)',
       [intensity]
@@ -348,87 +251,28 @@ app.get('/api/data', async (req, res) => {
 let deviceStates = {
   fan: "OFF",
   plantLight: "OFF",
-  pump: "OFF"
+  pump: "OFF",
+  automation: "OFF"
 };
 
 app.get('/api/device-states', (req, res) => {
   res.json(deviceStates);
 });
 
-
 app.post('/api/update-device-state', async (req, res) => {
   const { device, state } = req.body;
   
-  if (!['fan', 'pump', 'automation'].includes(device)) {
+  if (!['fan', 'pump'].includes(device)) {
     return res.status(400).json({ error: 'Invalid device' });
   }
 
   try {
-    // Get current state to compare
-    const current = await pool.query(
-      'SELECT state FROM device_states WHERE device = $1',
-      [device]
-    );
-    const currentState = current.rows[0]?.state;
-    
-    // Only log if state changed
-    if (currentState !== state) {
-      console.log(`[${new Date().toISOString()}] Device ${device} state changed from ${currentState} to ${state}`);
-      
-      // If automation is being turned on, start the automation process
-      if (device === 'automation' && state === 'ON') {
-        setupPumpAutomation();
-      }
-    }
-
     await pool.query(
       'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
       'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
       [device, state]
     );
     res.json({ success: true });
-  } catch (err) {
-    console.error('Error updating device state:', err);
-    res.status(500).json({ error: 'Database error' });
-  }
-});
-
-app.get('/api/next-pump-time', async (req, res) => {
-  try {
-    const result = await pool.query(
-      'SELECT state FROM device_states WHERE device = $1',
-      ['automation']
-    );
-    
-    if (result.rows[0]?.state !== 'ON') {
-      return res.json({ status: 'Automation is OFF' });
-    }
-    
-    // Get current Helsinki time
-    const now = new Date(getHelsinkiTime());
-    const currentHour = now.getHours();
-    const currentMinutes = now.getMinutes();
-    
-    // Determine next trigger time (10:30 AM or 10:30 PM Helsinki time)
-    let nextTriggerHour = currentHour < 10 ? 10 : 
-                         (currentHour < 22 || (currentHour === 22 && currentMinutes < 30)) ? 22 : 10;
-    
-    // Calculate minutes until next trigger
-    let minutesUntilTrigger = (nextTriggerHour - currentHour) * 60 + (30 - currentMinutes);
-    
-    // If it's already past 10:30 PM, schedule for next day 10:30 AM
-    if (minutesUntilTrigger < 0) {
-      minutesUntilTrigger += (24 * 60); // Add 24 hours
-    }
-    
-    const nextTriggerTime = new Date(now.getTime() + minutesUntilTrigger * 60 * 1000);
-    
-    res.json({
-      status: 'Automation is ON',
-      nextPumpTime: nextTriggerTime.toISOString(),
-      nextPumpTimeLocal: nextTriggerTime.toLocaleString("fi-FI", {timeZone: "Europe/Helsinki"}),
-      inMinutes: minutesUntilTrigger
-    });
   } catch (err) {
     res.status(500).json({ error: 'Database error' });
   }
@@ -437,24 +281,10 @@ app.get('/api/next-pump-time', async (req, res) => {
 async function startServer() {
   try {
     await initDB();
-    
-    // Check if automation is on and start the automation process if needed
-    const result = await pool.query(
-      'SELECT state FROM device_states WHERE device = $1',
-      ['automation']
-    );
-    
-    if (result.rows[0]?.state === 'ON') {
-      console.log('Automation is ON - starting pump automation schedule for Helsinki time (10 AM/PM)');
-      setupPumpAutomation();
-    } else {
-      console.log('Automation is OFF - no scheduled pump automation');
-    }
-    
-    app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-      console.log(`Current Helsinki time: ${new Date(getHelsinkiTime())}`);
-    });
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);
