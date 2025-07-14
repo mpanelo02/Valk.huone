@@ -50,6 +50,12 @@ async function initDB() {
         SELECT 'fan', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'fan')
         RETURNING device, state
       `),
+
+      pool.query(`
+        INSERT INTO device_states (device, state)
+        SELECT 'plantLight', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'plantLight')
+        RETURNING device, state
+      `),
       
       pool.query(`
         INSERT INTO device_states (device, state)
@@ -290,7 +296,7 @@ app.get('/api/device-states', (req, res) => {
 app.post('/api/update-device-state', async (req, res) => {
   const { device, state } = req.body;
   
-  if (!['fan', 'pump', 'autobot'].includes(device)) {
+  if (!['fan', 'plantLight', 'pump', 'autobot'].includes(device)) {
     return res.status(400).json({ error: 'Invalid device' });
   }
 
