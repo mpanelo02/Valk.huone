@@ -3,13 +3,11 @@ import fetch from 'node-fetch';
 import pg from 'pg'; // Add PostgreSQL client
 import bodyParser from 'body-parser';
 
-
 const { Pool } = pg;
 const app = express();
 const PORT = process.env.PORT || 3000;
-const API_KEY = process.env.ARANET_API_KEY;
+const ARANET_API_KEY = process.env.ARANET_API_KEY;
 const SIGROW_API_KEY = process.env.SIGROW_API_KEY; // Consider moving this to environment variables too
-
 
 function logDeviceStateChange(device, state) {
   const timestamp = new Date().toISOString();
@@ -93,7 +91,6 @@ app.use((req, res, next) => {
   next();
 });
 
-
 // Light intensity endpoints
 app.get('/api/light-intensity', async (req, res) => {
   try {
@@ -106,7 +103,6 @@ app.get('/api/light-intensity', async (req, res) => {
     res.status(500).json({ error: 'Database error' });
   }
 });
-
 
 
 app.post('/api/light-intensity', async (req, res) => {
@@ -215,7 +211,7 @@ async function fetchHistoricalData(sensorId, metric) {
     const response = await fetch(
       `https://aranet.cloud/api/v1/measurements/history?sensor=${sensorId}&metric=${metric}`, 
       {
-        headers: { 'ApiKey': API_KEY, 'Content-Type': 'application/json' }
+        headers: { 'ApiKey': ARANET_API_KEY, 'Content-Type': 'application/json' }
       }
     );
     
@@ -235,13 +231,13 @@ app.get('/api/data', async (req, res) => {
     // First get the current data as before
     const [current1, current2, current3, cameraShot] = await Promise.all([
       fetch(`https://aranet.cloud/api/v1/measurements/last?sensor=1061612`, {
-        headers: { 'ApiKey': API_KEY, 'Content-Type': 'application/json' }
+        headers: { 'ApiKey': ARANET_API_KEY, 'Content-Type': 'application/json' }
       }),
       fetch(`https://aranet.cloud/api/v1/measurements/last?sensor=6305245`, {
-        headers: { 'ApiKey': API_KEY, 'Content-Type': 'application/json' }
+        headers: { 'ApiKey': ARANET_API_KEY, 'Content-Type': 'application/json' }
       }),
       fetch(`https://aranet.cloud/api/v1/measurements/last?sensor=3147479`, {
-        headers: { 'ApiKey': API_KEY, 'Content-Type': 'application/json' }
+        headers: { 'ApiKey': ARANET_API_KEY, 'Content-Type': 'application/json' }
       }),
       fetchLastCameraShot() // Get the camera shot data
     ]);
@@ -263,7 +259,6 @@ app.get('/api/data', async (req, res) => {
     const soilECHistory = await fetchHistoricalData(6305245, 10);
     const poreECHistory = await fetchHistoricalData(6305245, 11);
     
-
     res.json({ 
       sensor1: currentData1, 
       sensor2: currentData2, 
