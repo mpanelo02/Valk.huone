@@ -9,10 +9,6 @@ const PORT = process.env.PORT || 3000;
 const ARANET_API_KEY = process.env.ARANET_API_KEY;
 const SIGROW_API_KEY = process.env.SIGROW_API_KEY; // Consider moving this to environment variables too
 
-const AUTH_USERNAME = process.env.AUTH_USERNAME || 'admin';
-const AUTH_PASSWORD = process.env.AUTH_PASSWORD || 'farmlab123'; // Default for development only
-
-
 function logDeviceStateChange(device, state) {
   const timestamp = new Date().toISOString();
   console.log(`[${timestamp}] Device state changed - Device: ${device}, State: ${state}`);
@@ -95,27 +91,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Additional Middleware
-const basicAuth = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  
-  if (!authHeader) {
-    res.set('WWW-Authenticate', 'Basic realm="Authentication Required"');
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-
-  const base64Credentials = authHeader.split(' ')[1];
-  const credentials = Buffer.from(base64Credentials, 'base64').toString('ascii');
-  const [username, password] = credentials.split(':');
-
-  if (username === AUTH_USERNAME && password === AUTH_PASSWORD) {
-    return next();
-  }
-
-  res.set('WWW-Authenticate', 'Basic realm="Authentication Required"');
-  return res.status(401).json({ error: 'Invalid credentials' });
-};
-
 // Light intensity endpoints
 app.get('/api/light-intensity', async (req, res) => {
   try {
@@ -130,7 +105,7 @@ app.get('/api/light-intensity', async (req, res) => {
 });
 
 
-app.post('/api/light-intensity', basicAuth, async (req, res) => {
+app.post('/api/light-intensity', async (req, res) => {
   const { intensity } = req.body;
   
   if (intensity === undefined || intensity < 0 || intensity > 100) {
@@ -151,7 +126,7 @@ app.post('/api/light-intensity', basicAuth, async (req, res) => {
 
 
 // Get all device states endpoints
-app.get('/api/device-states', basicAuth, async (req, res) => {
+app.get('/api/device-states', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM device_states');
     const states = {};
@@ -313,7 +288,7 @@ app.get('/api/device-states', (req, res) => {
 });
 
 
-app.post('/api/update-device-state', basicAuth,async (req, res) => {
+app.post('/api/update-device-state', async (req, res) => {
   const { device, state } = req.body;
   
   if (!['fan', 'plantLight', 'pump', 'autobot'].includes(device)) {
