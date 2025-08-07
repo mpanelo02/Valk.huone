@@ -20,6 +20,87 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
+// async function initDB() {
+//   try {
+//     await pool.query(`
+//       CREATE TABLE IF NOT EXISTS device_states (
+//         device VARCHAR(50) PRIMARY KEY,
+//         state VARCHAR(10) NOT NULL
+//       );
+      
+//       CREATE TABLE IF NOT EXISTS light_intensity (
+//         id SERIAL PRIMARY KEY,
+//         value INT NOT NULL,
+//         created_at TIMESTAMP DEFAULT NOW()
+//       );
+//     `);
+
+//     await pool.query(`
+//       CREATE TABLE IF NOT EXISTS light_schedule (
+//         id SERIAL PRIMARY KEY,
+//         start_hour INT NOT NULL,
+//         start_minute INT NOT NULL,
+//         end_hour INT NOT NULL,
+//         end_minute INT NOT NULL,
+//         created_at TIMESTAMP DEFAULT NOW()
+//       );
+//     `);
+
+//     // Insert default schedule if none exists
+//     await pool.query(`
+//       INSERT INTO light_schedule (start_hour, start_minute, end_hour, end_minute)
+//       SELECT 8, 10, 23, 50
+//       WHERE NOT EXISTS (SELECT 1 FROM light_schedule)
+//     `);
+    
+//     // Insert default values and log them
+//     const initResults = await Promise.all([
+//       pool.query(`
+//         INSERT INTO light_intensity (value) 
+//         SELECT 50 WHERE NOT EXISTS (SELECT 1 FROM light_intensity)
+//         RETURNING value
+//       `),
+      
+//       pool.query(`
+//         INSERT INTO device_states (device, state)
+//         SELECT 'fan', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'fan')
+//         RETURNING device, state
+//       `),
+
+//       pool.query(`
+//         INSERT INTO device_states (device, state)
+//         SELECT 'plantLight', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'plantLight')
+//         RETURNING device, state
+//       `),
+      
+//       pool.query(`
+//         INSERT INTO device_states (device, state)
+//         SELECT 'pump', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'pump')
+//         RETURNING device, state
+//       `),
+      
+//       pool.query(`
+//         INSERT INTO device_states (device, state)
+//         SELECT 'autobot', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'autobot')
+//         RETURNING device, state
+//       `)
+//     ]);
+    
+//     // Log initialized states
+//     initResults.slice(1).forEach(result => {
+//       if (result.rows.length > 0) {
+//         const row = result.rows[0];
+//         logDeviceStateChange(row.device, row.state);
+//       }
+//     });
+    
+//     console.log('Database initialized');
+//   } catch (err) {
+//     console.error('Database initialization error:', err);
+//     process.exit(1);
+//   }
+// }
+
 async function initDB() {
   try {
     await pool.query(`
@@ -33,9 +114,7 @@ async function initDB() {
         value INT NOT NULL,
         created_at TIMESTAMP DEFAULT NOW()
       );
-    `);
 
-    await pool.query(`
       CREATE TABLE IF NOT EXISTS light_schedule (
         id SERIAL PRIMARY KEY,
         start_hour INT NOT NULL,
@@ -44,13 +123,6 @@ async function initDB() {
         end_minute INT NOT NULL,
         created_at TIMESTAMP DEFAULT NOW()
       );
-    `);
-
-    // Insert default schedule if none exists
-    await pool.query(`
-      INSERT INTO light_schedule (start_hour, start_minute, end_hour, end_minute)
-      SELECT 8, 10, 23, 50
-      WHERE NOT EXISTS (SELECT 1 FROM light_schedule)
     `);
     
     // Insert default values and log them
@@ -83,6 +155,12 @@ async function initDB() {
         INSERT INTO device_states (device, state)
         SELECT 'autobot', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'autobot')
         RETURNING device, state
+      `),
+
+      pool.query(`
+        INSERT INTO light_schedule (start_hour, start_minute, end_hour, end_minute)
+        SELECT 8, 10, 23, 50 WHERE NOT EXISTS (SELECT 1 FROM light_schedule)
+        RETURNING start_hour, start_minute, end_hour, end_minute
       `)
     ]);
     
@@ -90,7 +168,12 @@ async function initDB() {
     initResults.slice(1).forEach(result => {
       if (result.rows.length > 0) {
         const row = result.rows[0];
-        logDeviceStateChange(row.device, row.state);
+        if (row.device) {
+          logDeviceStateChange(row.device, row.state);
+        } else if (row.start_hour !== undefined) {
+          const timestamp = new Date().toISOString();
+          console.log(`[${timestamp}] Initial light schedule set: ${row.start_hour}:${row.start_minute} to ${row.end_hour}:${row.end_minute}`);
+        }
       }
     });
     
@@ -143,28 +226,80 @@ app.post('/api/light-intensity', async (req, res) => {
 });
 
 // Get light schedule
+// app.get('/api/light-schedule', async (req, res) => {
+//   try {
+//     const result = await pool.query(
+//       'SELECT start_hour, start_minute, end_hour, end_minute FROM light_schedule ORDER BY created_at DESC LIMIT 1'
+//     );
+//     res.json(result.rows[0]);
+//   } catch (err) {
+//     console.error('Error fetching light schedule:', err);
+//     res.status(500).json({ error: 'Database error' });
+//   }
+// });
+
+// // Update light schedule
+// app.post('/api/light-schedule', async (req, res) => {
+//   const { startHour, startMinute, endHour, endMinute } = req.body;
+  
+//   try {
+//     await pool.query(
+//       'INSERT INTO light_schedule (start_hour, start_minute, end_hour, end_minute) VALUES ($1, $2, $3, $4)',
+//       [startHour, startMinute, endHour, endMinute]
+//     );
+//     res.json({ success: true });
+//   } catch (err) {
+//     console.error('Error updating light schedule:', err);
+//     res.status(500).json({ error: 'Database error' });
+//   }
+// });
+
+// Light schedule endpoints
 app.get('/api/light-schedule', async (req, res) => {
   try {
     const result = await pool.query(
       'SELECT start_hour, start_minute, end_hour, end_minute FROM light_schedule ORDER BY created_at DESC LIMIT 1'
     );
-    res.json(result.rows[0]);
+    if (result.rows.length > 0) {
+      const schedule = result.rows[0];
+      const timestamp = new Date().toISOString();
+      console.log(`[${timestamp}] Retrieved light schedule: ${schedule.start_hour}:${schedule.start_minute} to ${schedule.end_hour}:${schedule.end_minute}`);
+      res.json(schedule);
+    } else {
+      res.status(404).json({ error: 'No schedule found' });
+    }
   } catch (err) {
     console.error('Error fetching light schedule:', err);
     res.status(500).json({ error: 'Database error' });
   }
 });
 
-// Update light schedule
 app.post('/api/light-schedule', async (req, res) => {
   const { startHour, startMinute, endHour, endMinute } = req.body;
   
+  // Validate input
+  if ([startHour, startMinute, endHour, endMinute].some(val => 
+    val === undefined || val < 0 || 
+    (val > 23 && (val === startHour || val === endHour)) ||
+    (val > 59 && (val === startMinute || val === endMinute))
+  )) {
+    return res.status(400).json({ error: 'Invalid schedule values' });
+  }
+
   try {
-    await pool.query(
-      'INSERT INTO light_schedule (start_hour, start_minute, end_hour, end_minute) VALUES ($1, $2, $3, $4)',
+    const result = await pool.query(
+      'INSERT INTO light_schedule (start_hour, start_minute, end_hour, end_minute) VALUES ($1, $2, $3, $4) RETURNING *',
       [startHour, startMinute, endHour, endMinute]
     );
-    res.json({ success: true });
+    
+    if (result.rows.length > 0) {
+      const newSchedule = result.rows[0];
+      const timestamp = new Date().toISOString();
+      console.log(`[${timestamp}] Light schedule updated: ${newSchedule.start_hour}:${newSchedule.start_minute} to ${newSchedule.end_hour}:${newSchedule.end_minute}`);
+      res.json({ success: true, schedule: newSchedule });
+    } else {
+      res.status(500).json({ error: 'Failed to save schedule' });
+    }
   } catch (err) {
     console.error('Error updating light schedule:', err);
     res.status(500).json({ error: 'Database error' });
@@ -193,6 +328,25 @@ app.use((req, res, next) => {
 });
 
 app.use(bodyParser.json());
+
+// Log helper
+async function logCurrentSchedule() {
+  try {
+    const result = await pool.query(
+      'SELECT start_hour, start_minute, end_hour, end_minute FROM light_schedule ORDER BY created_at DESC LIMIT 1'
+    );
+    if (result.rows.length > 0) {
+      const schedule = result.rows[0];
+      const timestamp = new Date().toISOString();
+      console.log(`[${timestamp}] Current light schedule: ${schedule.start_hour}:${schedule.start_minute} to ${schedule.end_hour}:${schedule.end_minute}`);
+    }
+  } catch (err) {
+    console.error('Error logging current schedule:', err);
+  }
+}
+
+// Call this periodically if you want (e.g., every hour)
+setInterval(logCurrentSchedule, 3600000); // Every hour
 
 
 const base_api_url = "https://app.sigrow.com/api/v2/camera/1171/shots";
@@ -368,13 +522,29 @@ app.post('/api/update-device-state', async (req, res) => {
   }
 });
 
+// async function startServer() {
+//   try {
+//     await initDB();
+
+//   app.listen(PORT, () => {
+//   console.log(`Server running on port ${PORT}`);
+// });
+//   } catch (error) {
+//     console.error('Failed to start server:', error);
+//     process.exit(1);
+//   }
+// }
+
 async function startServer() {
   try {
     await initDB();
+    
+    // Log the current schedule on startup
+    await logCurrentSchedule();
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);
