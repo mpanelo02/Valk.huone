@@ -34,6 +34,24 @@ async function initDB() {
         created_at TIMESTAMP DEFAULT NOW()
       );
     `);
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS light_schedule (
+        id SERIAL PRIMARY KEY,
+        start_hour INT NOT NULL,
+        start_minute INT NOT NULL,
+        end_hour INT NOT NULL,
+        end_minute INT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
+    `);
+
+    // Insert default schedule if none exists
+    await pool.query(`
+      INSERT INTO light_schedule (start_hour, start_minute, end_hour, end_minute)
+      SELECT 8, 10, 23, 50
+      WHERE NOT EXISTS (SELECT 1 FROM light_schedule)
+    `);
     
     // Insert default values and log them
     const initResults = await Promise.all([
@@ -124,6 +142,34 @@ app.post('/api/light-intensity', async (req, res) => {
   }
 });
 
+// Get light schedule
+app.get('/api/light-schedule', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT start_hour, start_minute, end_hour, end_minute FROM light_schedule ORDER BY created_at DESC LIMIT 1'
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error fetching light schedule:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Update light schedule
+app.post('/api/light-schedule', async (req, res) => {
+  const { startHour, startMinute, endHour, endMinute } = req.body;
+  
+  try {
+    await pool.query(
+      'INSERT INTO light_schedule (start_hour, start_minute, end_hour, end_minute) VALUES ($1, $2, $3, $4)',
+      [startHour, startMinute, endHour, endMinute]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error updating light schedule:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
 
 // Get all device states endpoints
 app.get('/api/device-states', async (req, res) => {
