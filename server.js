@@ -20,86 +20,6 @@ const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
-// async function initDB() {
-//   try {
-//     await pool.query(`
-//       CREATE TABLE IF NOT EXISTS device_states (
-//         device VARCHAR(50) PRIMARY KEY,
-//         state VARCHAR(10) NOT NULL
-//       );
-      
-//       CREATE TABLE IF NOT EXISTS light_intensity (
-//         id SERIAL PRIMARY KEY,
-//         value INT NOT NULL,
-//         created_at TIMESTAMP DEFAULT NOW()
-//       );
-//     `);
-
-//     await pool.query(`
-//       CREATE TABLE IF NOT EXISTS light_schedule (
-//         id SERIAL PRIMARY KEY,
-//         start_hour INT NOT NULL,
-//         start_minute INT NOT NULL,
-//         end_hour INT NOT NULL,
-//         end_minute INT NOT NULL,
-//         created_at TIMESTAMP DEFAULT NOW()
-//       );
-//     `);
-
-//     // Insert default schedule if none exists
-//     await pool.query(`
-//       INSERT INTO light_schedule (start_hour, start_minute, end_hour, end_minute)
-//       SELECT 8, 10, 23, 50
-//       WHERE NOT EXISTS (SELECT 1 FROM light_schedule)
-//     `);
-    
-//     // Insert default values and log them
-//     const initResults = await Promise.all([
-//       pool.query(`
-//         INSERT INTO light_intensity (value) 
-//         SELECT 50 WHERE NOT EXISTS (SELECT 1 FROM light_intensity)
-//         RETURNING value
-//       `),
-      
-//       pool.query(`
-//         INSERT INTO device_states (device, state)
-//         SELECT 'fan', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'fan')
-//         RETURNING device, state
-//       `),
-
-//       pool.query(`
-//         INSERT INTO device_states (device, state)
-//         SELECT 'plantLight', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'plantLight')
-//         RETURNING device, state
-//       `),
-      
-//       pool.query(`
-//         INSERT INTO device_states (device, state)
-//         SELECT 'pump', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'pump')
-//         RETURNING device, state
-//       `),
-      
-//       pool.query(`
-//         INSERT INTO device_states (device, state)
-//         SELECT 'autobot', 'OFF' WHERE NOT EXISTS (SELECT 1 FROM device_states WHERE device = 'autobot')
-//         RETURNING device, state
-//       `)
-//     ]);
-    
-//     // Log initialized states
-//     initResults.slice(1).forEach(result => {
-//       if (result.rows.length > 0) {
-//         const row = result.rows[0];
-//         logDeviceStateChange(row.device, row.state);
-//       }
-//     });
-    
-//     console.log('Database initialized');
-//   } catch (err) {
-//     console.error('Database initialization error:', err);
-//     process.exit(1);
-//   }
-// }
 
 async function initDB() {
   try {
@@ -225,34 +145,6 @@ app.post('/api/light-intensity', async (req, res) => {
   }
 });
 
-// Get light schedule
-// app.get('/api/light-schedule', async (req, res) => {
-//   try {
-//     const result = await pool.query(
-//       'SELECT start_hour, start_minute, end_hour, end_minute FROM light_schedule ORDER BY created_at DESC LIMIT 1'
-//     );
-//     res.json(result.rows[0]);
-//   } catch (err) {
-//     console.error('Error fetching light schedule:', err);
-//     res.status(500).json({ error: 'Database error' });
-//   }
-// });
-
-// // Update light schedule
-// app.post('/api/light-schedule', async (req, res) => {
-//   const { startHour, startMinute, endHour, endMinute } = req.body;
-  
-//   try {
-//     await pool.query(
-//       'INSERT INTO light_schedule (start_hour, start_minute, end_hour, end_minute) VALUES ($1, $2, $3, $4)',
-//       [startHour, startMinute, endHour, endMinute]
-//     );
-//     res.json({ success: true });
-//   } catch (err) {
-//     console.error('Error updating light schedule:', err);
-//     res.status(500).json({ error: 'Database error' });
-//   }
-// });
 
 // Light schedule endpoints
 app.get('/api/light-schedule', async (req, res) => {
@@ -522,18 +414,6 @@ app.post('/api/update-device-state', async (req, res) => {
   }
 });
 
-// async function startServer() {
-//   try {
-//     await initDB();
-
-//   app.listen(PORT, () => {
-//   console.log(`Server running on port ${PORT}`);
-// });
-//   } catch (error) {
-//     console.error('Failed to start server:', error);
-//     process.exit(1);
-//   }
-// }
 
 async function startServer() {
   try {
