@@ -43,6 +43,17 @@ async function initDB() {
         end_minute INT NOT NULL,
         created_at TIMESTAMP DEFAULT NOW()
       );
+
+      CREATE TABLE IF NOT EXISTS warning_thresholds (
+        id SERIAL PRIMARY KEY,
+        temp_high DECIMAL(5,2) NOT NULL,
+        temp_low DECIMAL(5,2) NOT NULL,
+        humid_high DECIMAL(5,2) NOT NULL,
+        humid_low DECIMAL(5,2) NOT NULL,
+        co2_high INT NOT NULL,
+        co2_low INT NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      );
     `);
     
     // Insert default values and log them
@@ -81,6 +92,13 @@ async function initDB() {
         INSERT INTO light_schedule (start_hour, start_minute, end_hour, end_minute)
         SELECT 8, 10, 23, 50 WHERE NOT EXISTS (SELECT 1 FROM light_schedule)
         RETURNING start_hour, start_minute, end_hour, end_minute
+      `),
+
+      pool.query(`
+        INSERT INTO warning_thresholds (temp_high, temp_low, humid_high, humid_low, co2_high, co2_low)
+        SELECT 23.0, 20.0, 75.0, 62.0, 620, 580 
+        WHERE NOT EXISTS (SELECT 1 FROM warning_thresholds)
+        RETURNING *
       `)
     ]);
     
@@ -96,6 +114,17 @@ async function initDB() {
         }
       }
     });
+
+    // Log initialized optimal range / thresholds
+    const thresholdsResult = initResults[initResults.length - 1];
+    if (thresholdsResult.rows.length > 0) {
+      const thresholds = thresholdsResult.rows[0];
+      const timestamp = new Date().toISOString();
+      console.log(`[${timestamp}] Initial warning thresholds set:
+        Temp: ${thresholds.temp_low}-${thresholds.temp_high}°C,
+        Humidity: ${thresholds.humid_low}-${thresholds.humid_high}%,
+        CO2: ${thresholds.co2_low}-${thresholds.co2_high}ppm`);
+    }
     
     console.log('Database initialized');
   } catch (err) {
@@ -125,7 +154,6 @@ app.get('/api/light-intensity', async (req, res) => {
   }
 });
 
-
 app.post('/api/light-intensity', async (req, res) => {
   const { intensity } = req.body;
   
@@ -145,6 +173,71 @@ app.post('/api/light-intensity', async (req, res) => {
   }
 });
 
+// Settings endpoint to handle both light schedule and thresholds
+app.post('/api/settings', async (req, res) => {
+  const { lightSchedule, warningThresholds } = req.body;
+  
+  if (!lightSchedule || !warningThresholds) {
+    return res.status(400).json({ error: 'Missing schedule or thresholds' });
+  }
+
+  try {
+    // Start a transaction
+    await pool.query('BEGIN');
+    
+    // Update light schedule
+    const scheduleResult = await pool.query(
+      'INSERT INTO light_schedule (start_hour, start_minute, end_hour, end_minute) ' +
+      'VALUES ($1, $2, $3, $4) RETURNING *',
+      [
+        lightSchedule.startHour,
+        lightSchedule.startMinute,
+        lightSchedule.endHour,
+        lightSchedule.endMinute
+      ]
+    );
+    
+    // Update warning thresholds
+    const thresholdsResult = await pool.query(
+      'INSERT INTO warning_thresholds (temp_high, temp_low, humid_high, humid_low, co2_high, co2_low) ' +
+      'VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [
+        warningThresholds.tempHigh,
+        warningThresholds.tempLow,
+        warningThresholds.humidHigh,
+        warningThresholds.humidLow,
+        warningThresholds.co2High,
+        warningThresholds.co2Low
+      ]
+    );
+    
+    // Commit the transaction
+    await pool.query('COMMIT');
+    
+    if (scheduleResult.rows.length > 0 && thresholdsResult.rows.length > 0) {
+      const timestamp = new Date().toISOString();
+      console.log(`[${timestamp}] Settings updated:
+        Light schedule: ${scheduleResult.rows[0].start_hour}:${scheduleResult.rows[0].start_minute} to ${scheduleResult.rows[0].end_hour}:${scheduleResult.rows[0].end_minute}
+        Warning thresholds:
+          Temp: ${thresholdsResult.rows[0].temp_low}-${thresholdsResult.rows[0].temp_high}°C,
+          Humidity: ${thresholdsResult.rows[0].humid_low}-${thresholdsResult.rows[0].humid_high}%,
+          CO2: ${thresholdsResult.rows[0].co2_low}-${thresholdsResult.rows[0].co2_high}ppm`);
+      
+      res.json({
+        success: true,
+        lightSchedule: scheduleResult.rows[0],
+        warningThresholds: thresholdsResult.rows[0]
+      });
+    } else {
+      await pool.query('ROLLBACK');
+      res.status(500).json({ error: 'Failed to save settings' });
+    }
+  } catch (err) {
+    await pool.query('ROLLBACK');
+    console.error('Error updating settings:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
 
 // Light schedule endpoints
 app.get('/api/light-schedule', async (req, res) => {
@@ -212,12 +305,69 @@ app.get('/api/device-states', async (req, res) => {
   }
 });
 
+// Get all range / thresholds endpoints
+app.get('/api/warning-thresholds', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT temp_high, temp_low, humid_high, humid_low, co2_high, co2_low ' +
+      'FROM warning_thresholds ORDER BY created_at DESC LIMIT 1'
+    );
+    
+    if (result.rows.length > 0) {
+      res.json(result.rows[0]);
+    } else {
+      res.status(404).json({ error: 'No thresholds found' });
+    }
+  } catch (err) {
+    console.error('Error fetching warning thresholds:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+app.post('/api/warning-thresholds', async (req, res) => {
+  const { tempHigh, tempLow, humidHigh, humidLow, co2High, co2Low } = req.body;
+  
+  // Validate input
+  if (
+    tempHigh === undefined || tempLow === undefined ||
+    humidHigh === undefined || humidLow === undefined ||
+    co2High === undefined || co2Low === undefined
+  ) {
+    return res.status(400).json({ error: 'Missing threshold values' });
+  }
+
+  try {
+    const result = await pool.query(
+      'INSERT INTO warning_thresholds (temp_high, temp_low, humid_high, humid_low, co2_high, co2_low) ' +
+      'VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [tempHigh, tempLow, humidHigh, humidLow, co2High, co2Low]
+    );
+    
+    if (result.rows.length > 0) {
+      const newThresholds = result.rows[0];
+      const timestamp = new Date().toISOString();
+      console.log(`[${timestamp}] Warning thresholds updated:
+        Temp: ${newThresholds.temp_low}-${newThresholds.temp_high}°C,
+        Humidity: ${newThresholds.humid_low}-${newThresholds.humid_high}%,
+        CO2: ${newThresholds.co2_low}-${newThresholds.co2_high}ppm`);
+      
+      res.json(newThresholds);
+    } else {
+      res.status(500).json({ error: 'Failed to save thresholds' });
+    }
+  } catch (err) {
+    console.error('Error updating warning thresholds:', err);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   next();
 });
+
 
 app.use(bodyParser.json());
 
