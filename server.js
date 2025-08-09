@@ -57,6 +57,19 @@ async function initDB() {
         created_at TIMESTAMP DEFAULT NOW()
       );
     `);
+
+    try {
+      await pool.query('SELECT moisture_high FROM warning_thresholds LIMIT 1');
+    } catch (err) {
+      if (err.code === '42703') { // undefined column error code
+        await pool.query(`
+          ALTER TABLE warning_thresholds 
+          ADD COLUMN moisture_high DECIMAL(5,2) NOT NULL DEFAULT 34.0,
+          ADD COLUMN moisture_low DECIMAL(5,2) NOT NULL DEFAULT 30.0
+        `);
+        console.log('Added missing moisture columns to warning_thresholds');
+      }
+    }
     
     // Insert default values and log them
     const initResults = await Promise.all([
