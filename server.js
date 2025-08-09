@@ -58,17 +58,35 @@ async function initDB() {
       );
     `);
 
+    // try {
+    //   await pool.query('SELECT moisture_high FROM warning_thresholds LIMIT 1');
+    // } catch (err) {
+    //   if (err.code === '42703') { // undefined column error code
+    //     await pool.query(`
+    //       ALTER TABLE warning_thresholds 
+    //       ADD COLUMN moisture_high DECIMAL(5,2) NOT NULL DEFAULT 34.0,
+    //       ADD COLUMN moisture_low DECIMAL(5,2) NOT NULL DEFAULT 30.0
+    //     `);
+    //     console.log('Added missing moisture columns to warning_thresholds');
+    //   }
+    // }
+
     try {
-      await pool.query('SELECT moisture_high FROM warning_thresholds LIMIT 1');
+        await pool.query('SELECT moisture_high FROM warning_thresholds LIMIT 1');
     } catch (err) {
-      if (err.code === '42703') { // undefined column error code
-        await pool.query(`
-          ALTER TABLE warning_thresholds 
-          ADD COLUMN moisture_high DECIMAL(5,2) NOT NULL DEFAULT 34.0,
-          ADD COLUMN moisture_low DECIMAL(5,2) NOT NULL DEFAULT 30.0
-        `);
-        console.log('Added missing moisture columns to warning_thresholds');
-      }
+        if (err.code === '42703') { // undefined column error code
+            console.log('Adding missing moisture columns to warning_thresholds');
+            await pool.query(`
+                ALTER TABLE warning_thresholds 
+                ADD COLUMN IF NOT EXISTS moisture_high DECIMAL(5,2) DEFAULT 34.0,
+                ADD COLUMN IF NOT EXISTS moisture_low DECIMAL(5,2) DEFAULT 30.0
+            `);
+            await pool.query(`
+                ALTER TABLE warning_thresholds 
+                ALTER COLUMN moisture_high SET NOT NULL,
+                ALTER COLUMN moisture_low SET NOT NULL
+            `);
+        }
     }
     
     // Insert default values and log them
@@ -197,6 +215,30 @@ app.post('/api/settings', async (req, res) => {
   if (!lightSchedule || !warningThresholds) {
     return res.status(400).json({ error: 'Missing schedule or thresholds' });
   }
+
+    // Validate light schedule
+    if (
+        lightSchedule.startHour === undefined || lightSchedule.startHour < 0 || lightSchedule.startHour > 23 ||
+        lightSchedule.startMinute === undefined || lightSchedule.startMinute < 0 || lightSchedule.startMinute > 59 ||
+        lightSchedule.endHour === undefined || lightSchedule.endHour < 0 || lightSchedule.endHour > 23 ||
+        lightSchedule.endMinute === undefined || lightSchedule.endMinute < 0 || lightSchedule.endMinute > 59
+    ) {
+        return res.status(400).json({ error: 'Invalid light schedule values' });
+    }
+
+    // Validate thresholds
+    if (
+        warningThresholds.tempHigh === undefined || 
+        warningThresholds.tempLow === undefined ||
+        warningThresholds.humidHigh === undefined || 
+        warningThresholds.humidLow === undefined ||
+        warningThresholds.co2High === undefined || 
+        warningThresholds.co2Low === undefined ||
+        warningThresholds.moistureHigh === undefined || 
+        warningThresholds.moistureLow === undefined
+    ) {
+        return res.status(400).json({ error: 'Missing threshold values' });
+    }
 
   try {
     // Start a transaction
