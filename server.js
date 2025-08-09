@@ -52,6 +52,8 @@ async function initDB() {
         humid_low DECIMAL(5,2) NOT NULL,
         co2_high INT NOT NULL,
         co2_low INT NOT NULL,
+        moisture_high DECIMAL(5,2) NOT NULL,
+        moisture_low DECIMAL(5,2) NOT NULL,
         created_at TIMESTAMP DEFAULT NOW()
       );
     `);
@@ -95,8 +97,8 @@ async function initDB() {
       `),
 
       pool.query(`
-        INSERT INTO warning_thresholds (temp_high, temp_low, humid_high, humid_low, co2_high, co2_low)
-        SELECT 23.0, 20.0, 75.0, 62.0, 620, 580 
+        INSERT INTO warning_thresholds (temp_high, temp_low, humid_high, humid_low, co2_high, co2_low, moisture_high, moisture_low)
+        SELECT 23.0, 20.0, 75.0, 62.0, 620, 580, 34.0, 30.0
         WHERE NOT EXISTS (SELECT 1 FROM warning_thresholds)
         RETURNING *
       `)
@@ -123,7 +125,9 @@ async function initDB() {
       console.log(`[${timestamp}] Initial warning thresholds set:
         Temp: ${thresholds.temp_low}-${thresholds.temp_high}°C,
         Humidity: ${thresholds.humid_low}-${thresholds.humid_high}%,
-        CO2: ${thresholds.co2_low}-${thresholds.co2_high}ppm`);
+        CO2: ${thresholds.co2_low}-${thresholds.co2_high}ppm,
+        Moisture: ${thresholds.moisture_low}-${thresholds.moisture_high}%
+      `);
     }
     
     console.log('Database initialized');
@@ -199,15 +203,17 @@ app.post('/api/settings', async (req, res) => {
     
     // Update warning thresholds
     const thresholdsResult = await pool.query(
-      'INSERT INTO warning_thresholds (temp_high, temp_low, humid_high, humid_low, co2_high, co2_low) ' +
-      'VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      'INSERT INTO warning_thresholds (temp_high, temp_low, humid_high, humid_low, co2_high, co2_low, moisture_high, moisture_low) ' +
+      'VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
       [
         warningThresholds.tempHigh,
         warningThresholds.tempLow,
         warningThresholds.humidHigh,
         warningThresholds.humidLow,
         warningThresholds.co2High,
-        warningThresholds.co2Low
+        warningThresholds.co2Low,
+        warningThresholds.moistureHigh,
+        warningThresholds.moistureLow
       ]
     );
     
@@ -221,8 +227,10 @@ app.post('/api/settings', async (req, res) => {
         Warning thresholds:
           Temp: ${thresholdsResult.rows[0].temp_low}-${thresholdsResult.rows[0].temp_high}°C,
           Humidity: ${thresholdsResult.rows[0].humid_low}-${thresholdsResult.rows[0].humid_high}%,
-          CO2: ${thresholdsResult.rows[0].co2_low}-${thresholdsResult.rows[0].co2_high}ppm`);
-      
+          CO2: ${thresholdsResult.rows[0].co2_low}-${thresholdsResult.rows[0].co2_high}ppm,
+          Moisture: ${thresholdsResult.rows[0].moisture_low}-${thresholdsResult.rows[0].moisture_high}%
+      `);
+
       res.json({
         success: true,
         lightSchedule: scheduleResult.rows[0],
@@ -309,7 +317,7 @@ app.get('/api/device-states', async (req, res) => {
 app.get('/api/warning-thresholds', async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT temp_high, temp_low, humid_high, humid_low, co2_high, co2_low ' +
+      'SELECT temp_high, temp_low, humid_high, humid_low, co2_high, co2_low, moisture_high, moisture_low ' +
       'FROM warning_thresholds ORDER BY created_at DESC LIMIT 1'
     );
     
@@ -325,22 +333,23 @@ app.get('/api/warning-thresholds', async (req, res) => {
 });
 
 app.post('/api/warning-thresholds', async (req, res) => {
-  const { tempHigh, tempLow, humidHigh, humidLow, co2High, co2Low } = req.body;
-  
+  const { tempHigh, tempLow, humidHigh, humidLow, co2High, co2Low, moistureHigh, moistureLow } = req.body;
+
   // Validate input
   if (
     tempHigh === undefined || tempLow === undefined ||
     humidHigh === undefined || humidLow === undefined ||
-    co2High === undefined || co2Low === undefined
+    co2High === undefined || co2Low === undefined ||
+    moistureHigh === undefined || moistureLow === undefined
   ) {
     return res.status(400).json({ error: 'Missing threshold values' });
   }
 
   try {
     const result = await pool.query(
-      'INSERT INTO warning_thresholds (temp_high, temp_low, humid_high, humid_low, co2_high, co2_low) ' +
-      'VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-      [tempHigh, tempLow, humidHigh, humidLow, co2High, co2Low]
+      'INSERT INTO warning_thresholds (temp_high, temp_low, humid_high, humid_low, co2_high, co2_low, moisture_high, moisture_low) ' +
+      'VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *',
+      [tempHigh, tempLow, humidHigh, humidLow, co2High, co2Low, moistureHigh, moistureLow]
     );
     
     if (result.rows.length > 0) {
@@ -349,8 +358,10 @@ app.post('/api/warning-thresholds', async (req, res) => {
       console.log(`[${timestamp}] Warning thresholds updated:
         Temp: ${newThresholds.temp_low}-${newThresholds.temp_high}°C,
         Humidity: ${newThresholds.humid_low}-${newThresholds.humid_high}%,
-        CO2: ${newThresholds.co2_low}-${newThresholds.co2_high}ppm`);
-      
+        CO2: ${newThresholds.co2_low}-${newThresholds.co2_high}ppm,
+        Moisture: ${newThresholds.moisture_low}-${newThresholds.moisture_high}%
+      `);
+
       res.json(newThresholds);
     } else {
       res.status(500).json({ error: 'Failed to save thresholds' });
