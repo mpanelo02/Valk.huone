@@ -44,16 +44,6 @@ async function initDB() {
         created_at TIMESTAMP DEFAULT NOW()
       );
 
-      CREATE TABLE IF NOT EXISTS pump_schedule (
-        id SERIAL PRIMARY KEY,
-        first_irrigation_hour INT NOT NULL,
-        first_irrigation_minute INT NOT NULL,
-        second_irrigation_hour INT NOT NULL,
-        second_irrigation_minute INT NOT NULL,
-        duration_seconds INT NOT NULL,
-        created_at TIMESTAMP DEFAULT NOW()
-      );
-
       CREATE TABLE IF NOT EXISTS warning_thresholds (
         id SERIAL PRIMARY KEY,
         temp_high DECIMAL(5,2) NOT NULL,
@@ -68,6 +58,18 @@ async function initDB() {
       );
     `);
 
+    // try {
+    //   await pool.query('SELECT moisture_high FROM warning_thresholds LIMIT 1');
+    // } catch (err) {
+    //   if (err.code === '42703') { // undefined column error code
+    //     await pool.query(`
+    //       ALTER TABLE warning_thresholds 
+    //       ADD COLUMN moisture_high DECIMAL(5,2) NOT NULL DEFAULT 34.0,
+    //       ADD COLUMN moisture_low DECIMAL(5,2) NOT NULL DEFAULT 30.0
+    //     `);
+    //     console.log('Added missing moisture columns to warning_thresholds');
+    //   }
+    // }
 
     try {
         await pool.query('SELECT moisture_high FROM warning_thresholds LIMIT 1');
@@ -123,12 +125,6 @@ async function initDB() {
         INSERT INTO light_schedule (start_hour, start_minute, end_hour, end_minute)
         SELECT 8, 10, 23, 50 WHERE NOT EXISTS (SELECT 1 FROM light_schedule)
         RETURNING start_hour, start_minute, end_hour, end_minute
-      `),
-
-      pool.query(`
-        INSERT INTO pump_schedule (first_irrigation_hour, first_irrigation_minute, second_irrigation_hour, second_irrigation_minute, duration_seconds)
-        SELECT 9, 10, 21, 10, 60 
-        WHERE NOT EXISTS (SELECT 1 FROM pump_schedule)
       `),
 
       pool.query(`
@@ -354,72 +350,6 @@ app.post('/api/light-schedule', async (req, res) => {
     }
   } catch (err) {
     console.error('Error updating light schedule:', err);
-    res.status(500).json({ error: 'Database error' });
-  }
-});
-
-// Get current pump schedule
-app.get('/api/pump-schedule', async (req, res) => {
-  try {
-    const result = await pool.query(
-      'SELECT first_irrigation_hour, first_irrigation_minute, ' +
-      'second_irrigation_hour, second_irrigation_minute, duration_seconds ' +
-      'FROM pump_schedule ORDER BY created_at DESC LIMIT 1'
-    );
-    res.json(result.rows[0] || {});
-  } catch (err) {
-    res.status(500).json({ error: 'Database error' });
-  }
-});
-
-// Update pump schedule
-app.post('/api/pump-schedule', async (req, res) => {
-  const { 
-    firstIrrigationHour, 
-    firstIrrigationMinute,
-    secondIrrigationHour,
-    secondIrrigationMinute,
-    durationSeconds
-  } = req.body;
-
-  // Validate input
-  if (
-    firstIrrigationHour === undefined || firstIrrigationHour < 0 || firstIrrigationHour > 23 ||
-    firstIrrigationMinute === undefined || firstIrrigationMinute < 0 || firstIrrigationMinute > 59 ||
-    secondIrrigationHour === undefined || secondIrrigationHour < 0 || secondIrrigationHour > 23 ||
-    secondIrrigationMinute === undefined || secondIrrigationMinute < 0 || secondIrrigationMinute > 59 ||
-    durationSeconds === undefined || durationSeconds < 1 || durationSeconds > 3600
-  ) {
-    return res.status(400).json({ error: 'Invalid pump schedule values' });
-  }
-
-  try {
-    const result = await pool.query(
-      'INSERT INTO pump_schedule (first_irrigation_hour, first_irrigation_minute, ' +
-      'second_irrigation_hour, second_irrigation_minute, duration_seconds) ' +
-      'VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [
-        firstIrrigationHour,
-        firstIrrigationMinute,
-        secondIrrigationHour,
-        secondIrrigationMinute,
-        durationSeconds
-      ]
-    );
-
-        // Enhanced logging
-    if (result.rows.length > 0) {
-      const newSchedule = result.rows[0];
-      const timestamp = new Date().toISOString();
-      console.log(`[${timestamp}] Pump schedule updated:
-        1st Irrigation: ${newSchedule.first_irrigation_hour.toString().padStart(2, '0')}:${newSchedule.first_irrigation_minute.toString().padStart(2, '0')}
-        2nd Irrigation: ${newSchedule.second_irrigation_hour.toString().padStart(2, '0')}:${newSchedule.second_irrigation_minute.toString().padStart(2, '0')}
-        Duration: ${newSchedule.duration_seconds} seconds
-      `);
-    }
-    
-    res.json(result.rows[0]);
-  } catch (err) {
     res.status(500).json({ error: 'Database error' });
   }
 });
