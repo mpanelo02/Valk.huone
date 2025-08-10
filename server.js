@@ -406,6 +406,17 @@ app.post('/api/pump-schedule', async (req, res) => {
         durationSeconds
       ]
     );
+
+        // Enhanced logging
+    if (result.rows.length > 0) {
+      const newSchedule = result.rows[0];
+      const timestamp = new Date().toISOString();
+      console.log(`[${timestamp}] Pump schedule updated:
+        1st Irrigation: ${newSchedule.first_irrigation_hour.toString().padStart(2, '0')}:${newSchedule.first_irrigation_minute.toString().padStart(2, '0')}
+        2nd Irrigation: ${newSchedule.second_irrigation_hour.toString().padStart(2, '0')}:${newSchedule.second_irrigation_minute.toString().padStart(2, '0')}
+        Duration: ${newSchedule.duration_seconds} seconds
+      `);
+    }
     
     res.json(result.rows[0]);
   } catch (err) {
