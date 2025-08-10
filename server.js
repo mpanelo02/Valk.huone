@@ -372,6 +372,46 @@ app.get('/api/pump-schedule', async (req, res) => {
 });
 
 // Update pump schedule
+// app.post('/api/pump-schedule', async (req, res) => {
+//   const { 
+//     firstIrrigationHour, 
+//     firstIrrigationMinute,
+//     secondIrrigationHour,
+//     secondIrrigationMinute,
+//     durationSeconds
+//   } = req.body;
+
+//   // Validate input
+//   if (
+//     firstIrrigationHour === undefined || firstIrrigationHour < 0 || firstIrrigationHour > 23 ||
+//     firstIrrigationMinute === undefined || firstIrrigationMinute < 0 || firstIrrigationMinute > 59 ||
+//     secondIrrigationHour === undefined || secondIrrigationHour < 0 || secondIrrigationHour > 23 ||
+//     secondIrrigationMinute === undefined || secondIrrigationMinute < 0 || secondIrrigationMinute > 59 ||
+//     durationSeconds === undefined || durationSeconds < 1 || durationSeconds > 3600
+//   ) {
+//     return res.status(400).json({ error: 'Invalid pump schedule values' });
+//   }
+
+//   try {
+//     const result = await pool.query(
+//       'INSERT INTO pump_schedule (first_irrigation_hour, first_irrigation_minute, ' +
+//       'second_irrigation_hour, second_irrigation_minute, duration_seconds) ' +
+//       'VALUES ($1, $2, $3, $4, $5) RETURNING *',
+//       [
+//         firstIrrigationHour,
+//         firstIrrigationMinute,
+//         secondIrrigationHour,
+//         secondIrrigationMinute,
+//         durationSeconds
+//       ]
+//     );
+    
+//     res.json(result.rows[0]);
+//   } catch (err) {
+//     res.status(500).json({ error: 'Database error' });
+//   }
+// });
+
 app.post('/api/pump-schedule', async (req, res) => {
   const { 
     firstIrrigationHour, 
@@ -406,8 +446,20 @@ app.post('/api/pump-schedule', async (req, res) => {
       ]
     );
     
+    // Enhanced logging
+    if (result.rows.length > 0) {
+      const newSchedule = result.rows[0];
+      const timestamp = new Date().toISOString();
+      console.log(`[${timestamp}] Pump schedule updated:
+        1st Irrigation: ${newSchedule.first_irrigation_hour.toString().padStart(2, '0')}:${newSchedule.first_irrigation_minute.toString().padStart(2, '0')}
+        2nd Irrigation: ${newSchedule.second_irrigation_hour.toString().padStart(2, '0')}:${newSchedule.second_irrigation_minute.toString().padStart(2, '0')}
+        Duration: ${newSchedule.duration_seconds} seconds
+      `);
+    }
+    
     res.json(result.rows[0]);
   } catch (err) {
+    console.error('Error updating pump schedule:', err);
     res.status(500).json({ error: 'Database error' });
   }
 });
