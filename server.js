@@ -371,47 +371,6 @@ app.get('/api/pump-schedule', async (req, res) => {
   }
 });
 
-// Update pump schedule
-// app.post('/api/pump-schedule', async (req, res) => {
-//   const { 
-//     firstIrrigationHour, 
-//     firstIrrigationMinute,
-//     secondIrrigationHour,
-//     secondIrrigationMinute,
-//     durationSeconds
-//   } = req.body;
-
-//   // Validate input
-//   if (
-//     firstIrrigationHour === undefined || firstIrrigationHour < 0 || firstIrrigationHour > 23 ||
-//     firstIrrigationMinute === undefined || firstIrrigationMinute < 0 || firstIrrigationMinute > 59 ||
-//     secondIrrigationHour === undefined || secondIrrigationHour < 0 || secondIrrigationHour > 23 ||
-//     secondIrrigationMinute === undefined || secondIrrigationMinute < 0 || secondIrrigationMinute > 59 ||
-//     durationSeconds === undefined || durationSeconds < 1 || durationSeconds > 3600
-//   ) {
-//     return res.status(400).json({ error: 'Invalid pump schedule values' });
-//   }
-
-//   try {
-//     const result = await pool.query(
-//       'INSERT INTO pump_schedule (first_irrigation_hour, first_irrigation_minute, ' +
-//       'second_irrigation_hour, second_irrigation_minute, duration_seconds) ' +
-//       'VALUES ($1, $2, $3, $4, $5) RETURNING *',
-//       [
-//         firstIrrigationHour,
-//         firstIrrigationMinute,
-//         secondIrrigationHour,
-//         secondIrrigationMinute,
-//         durationSeconds
-//       ]
-//     );
-    
-//     res.json(result.rows[0]);
-//   } catch (err) {
-//     res.status(500).json({ error: 'Database error' });
-//   }
-// });
-
 app.post('/api/pump-schedule', async (req, res) => {
   const { 
     firstIrrigationHour, 
@@ -739,6 +698,76 @@ app.post('/api/update-device-state', async (req, res) => {
     res.status(500).json({ error: 'Database error' });
   }
 });
+
+
+// --- Scheduler Loop ---
+async function runScheduler() {
+  try {
+    const now = new Date();
+    const hour = now.getHours();
+    const minute = now.getMinutes();
+
+    // --- Light schedule check ---
+    const lightResult = await pool.query(
+      'SELECT start_hour, start_minute, end_hour, end_minute FROM light_schedule ORDER BY created_at DESC LIMIT 1'
+    );
+    if (lightResult.rows.length > 0) {
+      const s = lightResult.rows[0];
+      const startMins = s.start_hour * 60 + s.start_minute;
+      const endMins = s.end_hour * 60 + s.end_minute;
+      const nowMins = hour * 60 + minute;
+
+      const shouldBeOn = (startMins <= nowMins && nowMins < endMins);
+      await pool.query(
+        'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
+        'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
+        ['plantLight', shouldBeOn ? 'ON' : 'OFF']
+      );
+      logDeviceStateChange("plantLight", shouldBeOn ? 'ON' : 'OFF');
+    }
+
+    // --- Pump schedule check ---
+    const pumpResult = await pool.query(
+      'SELECT first_irrigation_hour, first_irrigation_minute, ' +
+      'second_irrigation_hour, second_irrigation_minute, duration_seconds ' +
+      'FROM pump_schedule ORDER BY created_at DESC LIMIT 1'
+    );
+    if (pumpResult.rows.length > 0) {
+      const p = pumpResult.rows[0];
+      const times = [
+        { h: p.first_irrigation_hour, m: p.first_irrigation_minute },
+        { h: p.second_irrigation_hour, m: p.second_irrigation_minute }
+      ];
+
+      for (const t of times) {
+        if (t.h === hour && t.m === minute) {
+          // Turn pump ON
+          await pool.query(
+            'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
+            'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
+            ['pump', 'ON']
+          );
+          logDeviceStateChange("pump", "ON");
+
+          // Auto OFF after duration
+          setTimeout(async () => {
+            await pool.query(
+              'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
+              'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
+              ['pump', 'OFF']
+            );
+            logDeviceStateChange("pump", "OFF");
+          }, p.duration_seconds * 1000);
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Scheduler error:", err);
+  }
+}
+
+// Run every minute
+setInterval(runScheduler, 60 * 1000);
 
 
 async function startServer() {
