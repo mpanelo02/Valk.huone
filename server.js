@@ -779,6 +779,7 @@ async function runScheduler() {
   }
 }
 
+setInterval(runScheduler, 60 * 1000);
 
 async function startServer() {
   try {
