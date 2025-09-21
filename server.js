@@ -86,6 +86,16 @@ async function initDB() {
         }
     }
     
+    try {
+      await pool.query(`
+        ALTER TABLE device_states 
+        ADD COLUMN IF NOT EXISTS last_updated TIMESTAMP DEFAULT NOW()
+      `);
+      console.log("Checked/added last_updated column in device_states");
+    } catch (err) {
+      console.error("Error adding last_updated column:", err);
+    }
+
     // Insert default values and log them
     const initResults = await Promise.all([
       pool.query(`
@@ -713,7 +723,7 @@ async function runScheduler() {
       ['autobot']
     );
     const autobotOn = autobotRes.rows[0]?.state === 'ON';
-    if (!autobotOn) return; // Skip automation if autobot is OFF
+    if (!autobotOn) return;
 
     // --- Light schedule check ---
     const lightResult = await pool.query(
@@ -725,21 +735,18 @@ async function runScheduler() {
       const endMins = s.end_hour * 60 + s.end_minute;
       const nowMins = hour * 60 + minute;
 
-      // Expected state based on schedule
       const expectedState = (startMins <= nowMins && nowMins < endMins) ? 'ON' : 'OFF';
 
-      // Get current state from DB
       const lightStateRes = await pool.query(
         'SELECT state FROM device_states WHERE device = $1',
         ['plantLight']
       );
       const currentState = lightStateRes.rows[0]?.state || 'OFF';
 
-      // Only update if wrong or at transition
       if (currentState !== expectedState) {
         await pool.query(
-          'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
-          'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
+          'INSERT INTO device_states (device, state, last_updated) VALUES ($1, $2, NOW()) ' +
+          'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state, last_updated = NOW()',
           ['plantLight', expectedState]
         );
         logDeviceStateChange("plantLight", expectedState);
@@ -759,25 +766,38 @@ async function runScheduler() {
         { h: p.second_irrigation_hour, m: p.second_irrigation_minute }
       ];
 
+      // Get pump current state
+      const pumpStateRes = await pool.query(
+        'SELECT state, last_updated FROM device_states WHERE device = $1',
+        ['pump']
+      );
+      const pumpRow = pumpStateRes.rows[0] || {};
+      const currentPumpState = pumpRow.state || 'OFF';
+      const lastUpdated = pumpRow.last_updated ? new Date(pumpRow.last_updated) : null;
+
+      // Case 1: Trigger pump ON at exact schedule time
       for (const t of times) {
         if (t.h === hour && t.m === minute) {
-          // Turn pump ON
           await pool.query(
-            'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
-            'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
+            'INSERT INTO device_states (device, state, last_updated) VALUES ($1, $2, NOW()) ' +
+            'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state, last_updated = NOW()',
             ['pump', 'ON']
           );
           logDeviceStateChange("pump", "ON");
+        }
+      }
 
-          // Auto OFF after duration
-          setTimeout(async () => {
-            await pool.query(
-              'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
-              'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
-              ['pump', 'OFF']
-            );
-            logDeviceStateChange("pump", "OFF");
-          }, p.duration_seconds * 1000);
+      // Case 2: Recovery check → should pump still be ON?
+      if (currentPumpState === 'ON' && lastUpdated) {
+        const elapsed = (now - lastUpdated) / 1000; // seconds
+        if (elapsed >= p.duration_seconds) {
+          // Pump should be OFF already
+          await pool.query(
+            'INSERT INTO device_states (device, state, last_updated) VALUES ($1, $2, NOW()) ' +
+            'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state, last_updated = NOW()',
+            ['pump', 'OFF']
+          );
+          logDeviceStateChange("pump", "OFF");
         }
       }
     }
@@ -785,7 +805,6 @@ async function runScheduler() {
     console.error("Scheduler error:", err);
   }
 }
-
 
 setInterval(runScheduler, 60 * 1000);
 
