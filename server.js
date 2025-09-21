@@ -706,6 +706,7 @@ async function runScheduler() {
     const now = new Date();
     const hour = now.getHours();
     const minute = now.getMinutes();
+    const second = now.getSeconds();
 
     // --- Check if autobot is ON ---
     const autobotRes = await pool.query(
@@ -713,7 +714,7 @@ async function runScheduler() {
       ['autobot']
     );
     const autobotOn = autobotRes.rows[0]?.state === 'ON';
-    if (!autobotOn) return;
+    if (!autobotOn) return; // Skip automation if autobot is OFF
 
     // --- Light schedule check ---
     const lightResult = await pool.query(
@@ -725,18 +726,21 @@ async function runScheduler() {
       const endMins = s.end_hour * 60 + s.end_minute;
       const nowMins = hour * 60 + minute;
 
+      // Expected state based on schedule
       const expectedState = (startMins <= nowMins && nowMins < endMins) ? 'ON' : 'OFF';
 
+      // Get current state from DB
       const lightStateRes = await pool.query(
         'SELECT state FROM device_states WHERE device = $1',
         ['plantLight']
       );
       const currentState = lightStateRes.rows[0]?.state || 'OFF';
 
+      // Only update if wrong or at transition
       if (currentState !== expectedState) {
         await pool.query(
-          'INSERT INTO device_states (device, state, last_updated) VALUES ($1, $2, NOW()) ' +
-          'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state, last_updated = NOW()',
+          'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
+          'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
           ['plantLight', expectedState]
         );
         logDeviceStateChange("plantLight", expectedState);
@@ -749,6 +753,7 @@ async function runScheduler() {
       'second_irrigation_hour, second_irrigation_minute, duration_seconds ' +
       'FROM pump_schedule ORDER BY created_at DESC LIMIT 1'
     );
+    
     if (pumpResult.rows.length > 0) {
       const p = pumpResult.rows[0];
       const times = [
@@ -756,45 +761,75 @@ async function runScheduler() {
         { h: p.second_irrigation_hour, m: p.second_irrigation_minute }
       ];
 
-      // Get pump current state
+      // Get current pump state
       const pumpStateRes = await pool.query(
-        'SELECT state, last_updated FROM device_states WHERE device = $1',
+        'SELECT state FROM device_states WHERE device = $1',
         ['pump']
       );
-      const pumpRow = pumpStateRes.rows[0] || {};
-      const currentPumpState = pumpRow.state || 'OFF';
-      const lastUpdated = pumpRow.last_updated ? new Date(pumpRow.last_updated) : null;
+      const currentPumpState = pumpStateRes.rows[0]?.state || 'OFF';
 
-      // Case 1: Trigger pump ON at exact schedule time
+      // Check if pump should be running based on schedule
+      let shouldPumpBeOn = false;
+      let remainingTime = 0;
+
       for (const t of times) {
-        if (t.h === hour && t.m === minute) {
-          await pool.query(
-            'INSERT INTO device_states (device, state, last_updated) VALUES ($1, $2, NOW()) ' +
-            'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state, last_updated = NOW()',
-            ['pump', 'ON']
-          );
-          logDeviceStateChange("pump", "ON");
+        const scheduledTimeMins = t.h * 60 + t.m;
+        const nowMins = hour * 60 + minute;
+        const nowTotalSeconds = hour * 3600 + minute * 60 + second;
+        const scheduledTimeSeconds = t.h * 3600 + t.m * 60;
+        
+        // Check if we're within the duration window for this irrigation time
+        if (nowTotalSeconds >= scheduledTimeSeconds && 
+            nowTotalSeconds < scheduledTimeSeconds + p.duration_seconds) {
+          shouldPumpBeOn = true;
+          remainingTime = (scheduledTimeSeconds + p.duration_seconds) - nowTotalSeconds;
+          break;
+        }
+        
+        // Also check if we're exactly at the scheduled time
+        if (t.h === hour && t.m === minute && second === 0) {
+          shouldPumpBeOn = true;
+          remainingTime = p.duration_seconds;
+          break;
         }
       }
 
-      // Case 2: Recovery check → should pump still be ON?
-      if (currentPumpState === 'ON' && lastUpdated) {
-        const elapsed = (now - lastUpdated) / 1000; // seconds
-        if (elapsed >= p.duration_seconds) {
-          // Pump should be OFF already
-          await pool.query(
-            'INSERT INTO device_states (device, state, last_updated) VALUES ($1, $2, NOW()) ' +
-            'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state, last_updated = NOW()',
-            ['pump', 'OFF']
-          );
-          logDeviceStateChange("pump", "OFF");
+      // Handle pump state recovery
+      if (shouldPumpBeOn && currentPumpState !== 'ON') {
+        // Turn pump ON
+        await pool.query(
+          'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
+          'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
+          ['pump', 'ON']
+        );
+        logDeviceStateChange("pump", "ON");
+
+        // Set timeout to turn pump OFF after remaining time
+        if (remainingTime > 0) {
+          setTimeout(async () => {
+            await pool.query(
+              'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
+              'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
+              ['pump', 'OFF']
+            );
+            logDeviceStateChange("pump", "OFF");
+          }, remainingTime * 1000);
         }
+      } else if (!shouldPumpBeOn && currentPumpState === 'ON') {
+        // Pump should be OFF but is currently ON
+        await pool.query(
+          'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
+          'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
+          ['pump', 'OFF']
+        );
+        logDeviceStateChange("pump", "OFF");
       }
     }
   } catch (err) {
     console.error("Scheduler error:", err);
   }
 }
+
 
 setInterval(runScheduler, 60 * 1000);
 
