@@ -707,26 +707,44 @@ async function runScheduler() {
     const hour = now.getHours();
     const minute = now.getMinutes();
 
-    // --- Light schedule check ---
-    const lightResult = await pool.query(
-      'SELECT start_hour, start_minute, end_hour, end_minute FROM light_schedule ORDER BY created_at DESC LIMIT 1'
+    // --- Get autobot state ---
+    const autobotResult = await pool.query(
+      'SELECT state FROM device_states WHERE device = $1',
+      ['autobot']
     );
-    if (lightResult.rows.length > 0) {
-      const s = lightResult.rows[0];
-      const startMins = s.start_hour * 60 + s.start_minute;
-      const endMins = s.end_hour * 60 + s.end_minute;
-      const nowMins = hour * 60 + minute;
+    const autobotOn = autobotResult.rows[0]?.state === 'ON';
 
-      const shouldBeOn = (startMins <= nowMins && nowMins < endMins);
-      await pool.query(
-        'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
-        'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
-        ['plantLight', shouldBeOn ? 'ON' : 'OFF']
+    // --- Light schedule check ---
+    if (autobotOn) {
+      const lightResult = await pool.query(
+        'SELECT start_hour, start_minute, end_hour, end_minute FROM light_schedule ORDER BY created_at DESC LIMIT 1'
       );
-      logDeviceStateChange("plantLight", shouldBeOn ? 'ON' : 'OFF');
+      if (lightResult.rows.length > 0) {
+        const s = lightResult.rows[0];
+
+        // If it's exactly the start time → turn ON
+        if (hour === s.start_hour && minute === s.start_minute) {
+          await pool.query(
+            'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
+            'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
+            ['plantLight', 'ON']
+          );
+          logDeviceStateChange("plantLight", "ON");
+        }
+
+        // If it's exactly the end time → turn OFF
+        if (hour === s.end_hour && minute === s.end_minute) {
+          await pool.query(
+            'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
+            'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
+            ['plantLight', 'OFF']
+          );
+          logDeviceStateChange("plantLight", "OFF");
+        }
+      }
     }
 
-    // --- Pump schedule check ---
+    // --- Pump schedule check (same as before) ---
     const pumpResult = await pool.query(
       'SELECT first_irrigation_hour, first_irrigation_minute, ' +
       'second_irrigation_hour, second_irrigation_minute, duration_seconds ' +
