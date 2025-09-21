@@ -725,21 +725,28 @@ async function runScheduler() {
       const endMins = s.end_hour * 60 + s.end_minute;
       const nowMins = hour * 60 + minute;
 
-      let newState = null;
-      if (nowMins === startMins) newState = 'ON';   // turn ON only at schedule start
-      if (nowMins === endMins) newState = 'OFF';    // turn OFF only at schedule end
+      // Expected state based on schedule
+      const expectedState = (startMins <= nowMins && nowMins < endMins) ? 'ON' : 'OFF';
 
-      if (newState) {
+      // Get current state from DB
+      const lightStateRes = await pool.query(
+        'SELECT state FROM device_states WHERE device = $1',
+        ['plantLight']
+      );
+      const currentState = lightStateRes.rows[0]?.state || 'OFF';
+
+      // Only update if wrong or at transition
+      if (currentState !== expectedState) {
         await pool.query(
           'INSERT INTO device_states (device, state) VALUES ($1, $2) ' +
           'ON CONFLICT (device) DO UPDATE SET state = EXCLUDED.state',
-          ['plantLight', newState]
+          ['plantLight', expectedState]
         );
-        logDeviceStateChange("plantLight", newState);
+        logDeviceStateChange("plantLight", expectedState);
       }
     }
 
-    // --- Pump schedule check (unchanged) ---
+    // --- Pump schedule check ---
     const pumpResult = await pool.query(
       'SELECT first_irrigation_hour, first_irrigation_minute, ' +
       'second_irrigation_hour, second_irrigation_minute, duration_seconds ' +
