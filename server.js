@@ -83,10 +83,6 @@ async function initDB() {
                 ALTER COLUMN moisture_high SET NOT NULL,
                 ALTER COLUMN moisture_low SET NOT NULL
             `);
-            await pool.query(`
-              ALTER TABLE device_states 
-              ADD COLUMN IF NOT EXISTS last_updated TIMESTAMP DEFAULT NOW();
-            `);
         }
     }
     
