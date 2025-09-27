@@ -8,6 +8,32 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const ARANET_API_KEY = process.env.ARANET_API_KEY;
 const SIGROW_API_KEY = process.env.SIGROW_API_KEY; // Consider moving this to environment variables too
+const WEATHER_API_KEY = process.env.WEATHER_API_KEY;
+
+const weather_api_url = `http://api.weatherapi.com/v1/current.json?key=${WEATHER_API_KEY}&q=Vantaa&aqi=no`;
+
+// Add this endpoint to server.js
+app.get('/api/weather', async (req, res) => {
+    try {
+        const response = await fetch(
+            `http://api.weatherapi.com/v1/current.json?key=${WEATHER_API_KEY}&q=Vantaa&aqi=no`,
+            {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            }
+        );
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        console.error('Weather API error:', error);
+        res.status(500).json({ error: 'Failed to fetch weather data' });
+    }
+});
 
 function logDeviceStateChange(device, state) {
   const timestamp = new Date().toISOString();
