@@ -10,8 +10,6 @@ const ARANET_API_KEY = process.env.ARANET_API_KEY;
 const SIGROW_API_KEY = process.env.SIGROW_API_KEY; // Consider moving this to environment variables too
 const WEATHER_API_KEY = process.env.WEATHER_API_KEY;
 
-const weather_api_url = `http://api.weatherapi.com/v1/current.json?key=${WEATHER_API_KEY}&q=Vantaa&aqi=no`;
-
 // Add this endpoint to server.js
 app.get('/api/weather', async (req, res) => {
     try {
