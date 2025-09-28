@@ -219,17 +219,17 @@ async function initDB() {
 app.use(bodyParser.json());
 
 // In server.js - temporary fix for testing
-app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+// app.use((req, res, next) => {
+//     res.header('Access-Control-Allow-Origin', '*');
+//     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+//     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
+//     if (req.method === 'OPTIONS') {
+//         return res.status(200).end();
+//     }
     
-    next();
-});
+//     next();
+// });
 
 // Light intensity endpoints
 app.get('/api/light-intensity', async (req, res) => {
