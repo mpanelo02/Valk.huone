@@ -2,7 +2,7 @@ import express from 'express';
 import fetch from 'node-fetch';
 import pg from 'pg'; // Add PostgreSQL client
 import bodyParser from 'body-parser';
-import cors from 'cors';
+// import cors from 'cors';
 
 const { Pool } = pg;
 const app = express();
@@ -12,14 +12,14 @@ const SIGROW_API_KEY = process.env.SIGROW_API_KEY; // Consider moving this to en
 const WEATHER_API_KEY = process.env.WEATHER_API_KEY;
 
 app.use(cors({
-    origin: ['https://strawberries-git-main-marks-projects-07a4f883.vercel.app/', 'http://localhost:3000', 'http://localhost:5500'],
+    origin: ['http://127.0.0.1:5500', 'http://localhost:3000', 'http://localhost:5500'],
     credentials: true
 }));
 
 app.get('/api/weather', async (req, res) => {
     try {
         // Add CORS headers specifically for this endpoint
-        res.header('Access-Control-Allow-Origin', 'https://strawberries-git-main-marks-projects-07a4f883.vercel.app/');
+        res.header('Access-Control-Allow-Origin', 'http://127.0.0.1:5500');
         res.header('Access-Control-Allow-Methods', 'GET');
         
         const response = await fetch(
@@ -208,20 +208,47 @@ async function initDB() {
 }
 
 // Middleware
-app.use(bodyParser.json());
-
 // In server.js - temporary fix for testing
+// app.use((req, res, next) => {
+//     res.header('Access-Control-Allow-Origin', '*');
+//     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+//     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    
+//     if (req.method === 'OPTIONS') {
+//         return res.status(200).end();
+//     }
+    
+//     next();
+// });
 app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
+    const allowedOrigins = [
+        'http://127.0.0.1:5500',
+        'http://localhost:3000', 
+        'http://localhost:5500',
+        'https://strawberries-git-main-marks-projects-07a4f883.vercel.app',
+        'https://strawberries.vercel.app' // Add your main domain if different
+    ];
+    
+    const origin = req.headers.origin;
+    
+    if (allowedOrigins.includes(origin)) {
+        res.header('Access-Control-Allow-Origin', origin);
+    }
+    
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Credentials', 'true');
     
+    // Handle preflight requests
     if (req.method === 'OPTIONS') {
         return res.status(200).end();
     }
     
     next();
 });
+
+app.use(bodyParser.json());
+
 
 // Light intensity endpoints
 app.get('/api/light-intensity', async (req, res) => {
