@@ -15,20 +15,7 @@ const WEATHER_API_KEY = process.env.WEATHER_API_KEY;
 // Remove the individual CORS headers for the weather endpoint
 app.get('/api/weather', async (req, res) => {
     try {
-        // Set CORS headers specifically for this endpoint
-        const origin = req.headers.origin;
-        const allowedOrigins = [
-            'https://strawberries-git-main-marks-projects-07a4f883.vercel.app',
-            'https://u-farm-lab-git-main-marks-projects-07a4f883.vercel.app',
-            'https://simple-hauz-git-main-marks-projects-07a4f883.vercel.app',
-            'http://127.0.0.1:5500',
-            'http://localhost:3000'
-        ];
-        
-        if (allowedOrigins.includes(origin)) {
-            res.header('Access-Control-Allow-Origin', origin);
-        }
-        res.header('Access-Control-Allow-Credentials', 'true');
+
         
         const response = await fetch(
             `http://api.weatherapi.com/v1/current.json?key=${WEATHER_API_KEY}&q=Vantaa&aqi=no`,
@@ -215,32 +202,21 @@ async function initDB() {
   }
 }
 
-// CORSMiddleware
-// app.use((req, res, next) => {
-//     const allowedOrigins = [
-//         'http://127.0.0.1:5500',
-//         'http://localhost:3000',
-//         'http://localhost:5500', 
-//         'https://strawberries-git-main-marks-projects-07a4f883.vercel.app',
-//         'https://u-farm-lab-git-main-marks-projects-07a4f883.vercel.app'
-//     ];
-    
-//     const origin = req.headers.origin;
-//     if (allowedOrigins.includes(origin)) {
-//         res.header('Access-Control-Allow-Origin', origin);
-//     }
-    
-//     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-//     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-API-Key');
-//     res.header('Access-Control-Allow-Credentials', 'true');
-    
-//     // Handle preflight
-//     if (req.method === 'OPTIONS') {
-//         return res.status(200).end();
-//     }
-    
-//     next();
-// });
+// CORS Middleware
+// Update the CORS configuration at the top of your server.js
+app.use(cors({
+    origin: [
+        'http://127.0.0.1:5500', 
+        'http://localhost:3000', 
+        'http://localhost:5500',
+        'https://strawberries-git-main-marks-projects-07a4f883.vercel.app',
+        'https://u-farm-lab-git-main-marks-projects-07a4f883.vercel.app',
+        'https://simple-hauz-git-main-marks-projects-07a4f883.vercel.app'
+        // 'https://strawberries-*.vercel.app'
+
+    ],
+    credentials: true
+}));
 
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
@@ -249,22 +225,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// app.use(cors({
-//     origin: [
-//         'http://127.0.0.1:5500',
-//         'http://localhost:3000', 
-//         'http://localhost:5500',
-//         'https://strawberries-git-main-marks-projects-07a4f883.vercel.app',
-//         'https://u-farm-lab-git-main-marks-projects-07a4f883.vercel.app',
-//         'https://simple-hauz-git-main-marks-projects-07a4f883.vercel.app/',
-//         'https://*.vercel.app'
-//     ],
-//     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-//     allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
-//     credentials: true
-// }));
-
-app.options('*', cors());
 
 app.use(bodyParser.json());
 
