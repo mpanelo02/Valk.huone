@@ -18,7 +18,10 @@ app.use(cors({
         'http://localhost:3000', 
         'http://localhost:5500',
         'https://strawberries-git-main-marks-projects-07a4f883.vercel.app',
-        'https://strawberries-*.vercel.app' // This will match any subdomain
+        'https://u-farm-lab-git-main-marks-projects-07a4f883.vercel.app/',
+        'https://simple-hauz-git-main-marks-projects-07a4f883.vercel.app/'
+        // 'https://strawberries-*.vercel.app'
+
     ],
     credentials: true
 }));
@@ -26,9 +29,7 @@ app.use(cors({
 // Remove the individual CORS headers for the weather endpoint
 app.get('/api/weather', async (req, res) => {
     try {
-        // Remove these lines - let the CORS middleware handle it
-        // res.header('Access-Control-Allow-Origin', 'http://127.0.0.1:5500');
-        // res.header('Access-Control-Allow-Methods', 'GET');
+
         
         const response = await fetch(
             `http://api.weatherapi.com/v1/current.json?key=${WEATHER_API_KEY}&q=Vantaa&aqi=no`,
@@ -216,20 +217,16 @@ async function initDB() {
 }
 
 // Middleware
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  next();
+});
+
+
 app.use(bodyParser.json());
 
-// In server.js - temporary fix for testing
-// app.use((req, res, next) => {
-//     res.header('Access-Control-Allow-Origin', '*');
-//     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-//     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    
-//     if (req.method === 'OPTIONS') {
-//         return res.status(200).end();
-//     }
-    
-//     next();
-// });
 
 // Light intensity endpoints
 app.get('/api/light-intensity', async (req, res) => {
@@ -548,15 +545,6 @@ app.post('/api/warning-thresholds', async (req, res) => {
   }
 });
 
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  next();
-});
-
-
-app.use(bodyParser.json());
 
 // Log helper
 async function logCurrentSchedule() {
