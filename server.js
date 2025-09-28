@@ -12,7 +12,7 @@ const SIGROW_API_KEY = process.env.SIGROW_API_KEY; // Consider moving this to en
 const WEATHER_API_KEY = process.env.WEATHER_API_KEY;
 
 app.use(cors({
-    origin: ['http://127.0.0.1:5500', 'http://localhost:3000', 'http://localhost:5500', 'https://strawberries-git-main-marks-projects-07a4f883.vercel.app/'],
+    origin: ['https://strawberries-git-main-marks-projects-07a4f883.vercel.app/', 'http://localhost:3000', 'http://localhost:5500'],
     credentials: true
 }));
 
