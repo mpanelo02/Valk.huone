@@ -18,9 +18,8 @@ app.use(cors({
 
 app.get('/api/weather', async (req, res) => {
     try {
-        // Add CORS headers specifically for this endpoint
-        res.header('Access-Control-Allow-Origin', 'http://127.0.0.1:5500');
-        res.header('Access-Control-Allow-Methods', 'GET');
+        // Remove any specific CORS headers from individual endpoints
+        // Let the global CORS middleware handle it
         
         const response = await fetch(
             `http://api.weatherapi.com/v1/current.json?key=${WEATHER_API_KEY}&q=Vantaa&aqi=no`,
@@ -220,26 +219,12 @@ async function initDB() {
     
 //     next();
 // });
+// Temporary CORS configuration for testing
 app.use((req, res, next) => {
-    const allowedOrigins = [
-        'http://127.0.0.1:5500',
-        'http://localhost:3000', 
-        'http://localhost:5500',
-        'https://strawberries-git-main-marks-projects-07a4f883.vercel.app',
-        'https://strawberries.vercel.app' // Add your main domain if different
-    ];
-    
-    const origin = req.headers.origin;
-    
-    if (allowedOrigins.includes(origin)) {
-        res.header('Access-Control-Allow-Origin', origin);
-    }
-    
+    res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Credentials', 'true');
     
-    // Handle preflight requests
     if (req.method === 'OPTIONS') {
         return res.status(200).end();
     }
