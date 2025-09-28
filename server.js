@@ -12,14 +12,14 @@ const SIGROW_API_KEY = process.env.SIGROW_API_KEY; // Consider moving this to en
 const WEATHER_API_KEY = process.env.WEATHER_API_KEY;
 
 app.use(cors({
-    origin: ['http://127.0.0.1:5500', 'http://localhost:3000', 'http://localhost:5500'],
+    origin: ['http://127.0.0.1:5500', 'http://localhost:3000', 'http://localhost:5500', 'https://strawberries-git-main-marks-projects-07a4f883.vercel.app/'],
     credentials: true
 }));
 
 app.get('/api/weather', async (req, res) => {
     try {
         // Add CORS headers specifically for this endpoint
-        res.header('Access-Control-Allow-Origin', 'http://127.0.0.1:5500');
+        res.header('Access-Control-Allow-Origin', 'https://strawberries-git-main-marks-projects-07a4f883.vercel.app/');
         res.header('Access-Control-Allow-Methods', 'GET');
         
         const response = await fetch(
