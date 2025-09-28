@@ -208,35 +208,13 @@ async function initDB() {
 }
 
 // Middleware
+app.use(bodyParser.json());
+
 // In server.js - temporary fix for testing
-// app.use((req, res, next) => {
-//     res.header('Access-Control-Allow-Origin', '*');
-//     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-//     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    
-//     if (req.method === 'OPTIONS') {
-//         return res.status(200).end();
-//     }
-    
-//     next();
-// });
-// More flexible CORS configuration
 app.use((req, res, next) => {
-    // Allow specific domains + any Vercel preview deployment
-    const origin = req.headers.origin;
-    
-    if (origin && (
-        origin.includes('localhost') ||
-        origin.includes('127.0.0.1') ||
-        origin.includes('vercel.app') ||
-        origin.includes('strawberries')
-    )) {
-        res.header('Access-Control-Allow-Origin', origin);
-    }
-    
+    res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Credentials', 'true');
     
     if (req.method === 'OPTIONS') {
         return res.status(200).end();
@@ -244,9 +222,6 @@ app.use((req, res, next) => {
     
     next();
 });
-
-app.use(bodyParser.json());
-
 
 // Light intensity endpoints
 app.get('/api/light-intensity', async (req, res) => {
@@ -565,12 +540,12 @@ app.post('/api/warning-thresholds', async (req, res) => {
   }
 });
 
-// app.use((req, res, next) => {
-//   res.header('Access-Control-Allow-Origin', '*');
-//   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-//   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-//   next();
-// });
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  next();
+});
 
 
 app.use(bodyParser.json());
