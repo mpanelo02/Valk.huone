@@ -11,16 +11,24 @@ const ARANET_API_KEY = process.env.ARANET_API_KEY;
 const SIGROW_API_KEY = process.env.SIGROW_API_KEY; // Consider moving this to environment variables too
 const WEATHER_API_KEY = process.env.WEATHER_API_KEY;
 
+// Update the CORS configuration at the top of your server.js
 app.use(cors({
-    origin: ['http://127.0.0.1:5500', 'http://localhost:3000', 'http://localhost:5500'],
+    origin: [
+        'http://127.0.0.1:5500', 
+        'http://localhost:3000', 
+        'http://localhost:5500',
+        'https://strawberries-git-main-marks-projects-07a4f883.vercel.app',
+        'https://strawberries-*.vercel.app' // This will match any subdomain
+    ],
     credentials: true
 }));
 
+// Remove the individual CORS headers for the weather endpoint
 app.get('/api/weather', async (req, res) => {
     try {
-        // Add CORS headers specifically for this endpoint
-        res.header('Access-Control-Allow-Origin', 'http://127.0.0.1:5500');
-        res.header('Access-Control-Allow-Methods', 'GET');
+        // Remove these lines - let the CORS middleware handle it
+        // res.header('Access-Control-Allow-Origin', 'http://127.0.0.1:5500');
+        // res.header('Access-Control-Allow-Methods', 'GET');
         
         const response = await fetch(
             `http://api.weatherapi.com/v1/current.json?key=${WEATHER_API_KEY}&q=Vantaa&aqi=no`,
