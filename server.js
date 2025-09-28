@@ -236,22 +236,22 @@ app.use((req, res, next) => {
 //   next();
 // });
 
-// app.use(cors({
-//     origin: [
-//         'http://127.0.0.1:5500',
-//         'http://localhost:3000', 
-//         'http://localhost:5500',
-//         'https://strawberries-git-main-marks-projects-07a4f883.vercel.app',
-//         'https://u-farm-lab-git-main-marks-projects-07a4f883.vercel.app',
-//         'https://simple-hauz-git-main-marks-projects-07a4f883.vercel.app/',
-//         'https://*.vercel.app'
-//     ],
-//     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-//     allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
-//     credentials: true
-// }));
+app.use(cors({
+    origin: [
+        'http://127.0.0.1:5500',
+        'http://localhost:3000', 
+        'http://localhost:5500',
+        'https://strawberries-git-main-marks-projects-07a4f883.vercel.app',
+        'https://u-farm-lab-git-main-marks-projects-07a4f883.vercel.app',
+        'https://simple-hauz-git-main-marks-projects-07a4f883.vercel.app/',
+        'https://*.vercel.app'
+    ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+    credentials: true
+}));
 
-// app.options('*', cors());
+app.options('*', cors());
 
 app.use(bodyParser.json());
 
