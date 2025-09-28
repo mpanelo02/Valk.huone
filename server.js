@@ -2,7 +2,7 @@ import express from 'express';
 import fetch from 'node-fetch';
 import pg from 'pg'; // Add PostgreSQL client
 import bodyParser from 'body-parser';
-// import cors from 'cors';
+import cors from 'cors';
 
 const { Pool } = pg;
 const app = express();
@@ -11,10 +11,22 @@ const ARANET_API_KEY = process.env.ARANET_API_KEY;
 const SIGROW_API_KEY = process.env.SIGROW_API_KEY; // Consider moving this to environment variables too
 const WEATHER_API_KEY = process.env.WEATHER_API_KEY;
 
+// Simple CORS configuration
+app.use(cors());
+
+// Or more specific:
+app.use(cors({
+    origin: ['http://127.0.0.1:5500', 'http://localhost:3000', 'http://localhost:5500'],
+    credentials: true
+}));
 
 // Add this endpoint to server.js
 app.get('/api/weather', async (req, res) => {
     try {
+        // Add CORS headers specifically for this endpoint
+        res.header('Access-Control-Allow-Origin', 'http://127.0.0.1:5500');
+        res.header('Access-Control-Allow-Methods', 'GET');
+        
         const response = await fetch(
             `http://api.weatherapi.com/v1/current.json?key=${WEATHER_API_KEY}&q=Vantaa&aqi=no`,
             {
@@ -24,14 +36,17 @@ app.get('/api/weather', async (req, res) => {
         );
         
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            throw new Error(`Weather API error! status: ${response.status}`);
         }
         
         const data = await response.json();
         res.json(data);
     } catch (error) {
         console.error('Weather API error:', error);
-        res.status(500).json({ error: 'Failed to fetch weather data' });
+        res.status(500).json({ 
+            error: 'Failed to fetch weather data',
+            detail: error.message 
+        });
     }
 });
 
@@ -196,27 +211,6 @@ async function initDB() {
     process.exit(1);
   }
 }
-
-app.use((req, res, next) => {
-    const allowedOrigins = ['http://127.0.0.1:5500', 'http://localhost:3000', 'http://localhost:5500'];
-    const origin = req.headers.origin;
-    
-    if (allowedOrigins.includes(origin)) {
-        res.header('Access-Control-Allow-Origin', origin);
-    }
-    
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    
-    // Handle preflight requests
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
-    
-    next();
-});
-
 
 // Middleware
 app.use(bodyParser.json());
