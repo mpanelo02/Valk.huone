@@ -2,7 +2,7 @@ import express from 'express';
 import fetch from 'node-fetch';
 import pg from 'pg'; // Add PostgreSQL client
 import bodyParser from 'body-parser';
-// import cors from 'cors';
+import cors from 'cors';
 
 const { Pool } = pg;
 const app = express();
@@ -567,12 +567,12 @@ app.post('/api/warning-thresholds', async (req, res) => {
   }
 });
 
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  next();
-});
+// app.use((req, res, next) => {
+//   res.header('Access-Control-Allow-Origin', '*');
+//   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+//   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+//   next();
+// });
 
 
 app.use(bodyParser.json());
