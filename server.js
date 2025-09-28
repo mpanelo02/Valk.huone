@@ -16,29 +16,6 @@ app.use(cors({
     credentials: true
 }));
 
-// Add this endpoint to server.js
-// app.get('/api/weather', async (req, res) => {
-//     try {
-//         const response = await fetch(
-//             `http://api.weatherapi.com/v1/current.json?key=${WEATHER_API_KEY}&q=Vantaa&aqi=no`,
-//             {
-//                 method: 'GET',
-//                 headers: { 'Content-Type': 'application/json' }
-//             }
-//         );
-        
-//         if (!response.ok) {
-//             throw new Error(`HTTP error! status: ${response.status}`);
-//         }
-        
-//         const data = await response.json();
-//         res.json(data);
-//     } catch (error) {
-//         console.error('Weather API error:', error);
-//         res.status(500).json({ error: 'Failed to fetch weather data' });
-//     }
-// });
-
 app.get('/api/weather', async (req, res) => {
     try {
         // Add CORS headers specifically for this endpoint
@@ -232,11 +209,7 @@ async function initDB() {
 
 // Middleware
 app.use(bodyParser.json());
-// app.use((req, res, next) => {
-//   res.header('Access-Control-Allow-Origin', '*');
-//   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-//   next();
-// });
+
 // In server.js - temporary fix for testing
 app.use((req, res, next) => {
     res.header('Access-Control-Allow-Origin', '*');
