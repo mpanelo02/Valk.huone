@@ -2,68 +2,12 @@ import express from 'express';
 import fetch from 'node-fetch';
 import pg from 'pg'; // Add PostgreSQL client
 import bodyParser from 'body-parser';
-import cors from 'cors';
 
 const { Pool } = pg;
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ARANET_API_KEY = process.env.ARANET_API_KEY;
 const SIGROW_API_KEY = process.env.SIGROW_API_KEY; // Consider moving this to environment variables too
-const WEATHER_API_KEY = process.env.WEATHER_API_KEY;
-
-// CORS configuration
-app.use(cors({
-    origin: [
-        'http://127.0.0.1:5500', 
-        'http://localhost:3000', 
-        'http://localhost:5500',
-        'https://strawberries-git-main-marks-projects-07a4f883.vercel.app',
-        'https://u-farm-lab-git-main-marks-projects-07a4f883.vercel.app',
-        'https://simple-hauz-git-main-marks-projects-07a4f883.vercel.app'
-        // 'https://strawberries-*.vercel.app'
-
-    ],
-    credentials: true
-}));
-
-// Middleware
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  next();
-});
-
-
-app.use(bodyParser.json());
-
-// Remove the individual CORS headers for the weather endpoint
-app.get('/api/weather', async (req, res) => {
-    try {
-
-        
-        const response = await fetch(
-            `http://api.weatherapi.com/v1/current.json?key=${WEATHER_API_KEY}&q=Vantaa&aqi=no`,
-            {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' }
-            }
-        );
-        
-        if (!response.ok) {
-            throw new Error(`Weather API error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        res.json(data);
-    } catch (error) {
-        console.error('Weather API error:', error);
-        res.status(500).json({ 
-            error: 'Failed to fetch weather data',
-            detail: error.message 
-        });
-    }
-});
 
 function logDeviceStateChange(device, state) {
   const timestamp = new Date().toISOString();
@@ -228,16 +172,12 @@ async function initDB() {
 }
 
 // Middleware
+app.use(bodyParser.json());
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   next();
 });
-
-
-app.use(bodyParser.json());
-
 
 // Light intensity endpoints
 app.get('/api/light-intensity', async (req, res) => {
@@ -556,6 +496,15 @@ app.post('/api/warning-thresholds', async (req, res) => {
   }
 });
 
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  next();
+});
+
+
+app.use(bodyParser.json());
 
 // Log helper
 async function logCurrentSchedule() {
