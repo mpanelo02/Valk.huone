@@ -18,7 +18,7 @@ app.use(cors({
         'http://localhost:3000', 
         'http://localhost:5500',
         'https://strawberries-git-main-marks-projects-07a4f883.vercel.app',
-        'https://mpanelo02.github.io/UrbanFarmLabTwin/',
+        'https://urban-farm-lab-twin-git-main-marks-projects-07a4f883.vercel.app/',
         'https://simple-hauz-git-main-marks-projects-07a4f883.vercel.app'
         // 'https://strawberries-*.vercel.app'
 
