@@ -18,7 +18,7 @@ app.use(cors({
         'http://localhost:3000', 
         'http://localhost:5500',
         'https://strawberries-git-main-marks-projects-07a4f883.vercel.app',
-        'https://u-farm-lab-git-main-marks-projects-07a4f883.vercel.app',
+        'https://mpanelo02.github.io/UrbanFarmLabTwin/',
         'https://simple-hauz-git-main-marks-projects-07a4f883.vercel.app'
         // 'https://strawberries-*.vercel.app'
 
@@ -654,186 +654,54 @@ async function fetchHistoricalData(sensorId, metric) {
   }
 }
 
-// app.get('/api/data', async (req, res) => {
-//   try {
-//     // First get the current data as before
-//     const [current1, current2, current3, cameraShot] = await Promise.all([
-//       fetch(`https://aranet.cloud/api/v1/measurements/last?sensor=1061612`, {
-//         headers: { 'ApiKey': ARANET_API_KEY, 'Content-Type': 'application/json' }
-//       }),
-//       fetch(`https://aranet.cloud/api/v1/measurements/last?sensor=6305245`, {
-//         headers: { 'ApiKey': ARANET_API_KEY, 'Content-Type': 'application/json' }
-//       }),
-//       fetch(`https://aranet.cloud/api/v1/measurements/last?sensor=3147479`, {
-//         headers: { 'ApiKey': ARANET_API_KEY, 'Content-Type': 'application/json' }
-//       }),
-//       fetchLastCameraShot() // Get the camera shot data
-//     ]);
-
-//     if (!current1.ok || !current2.ok || !current3.ok) {
-//       return res.status(500).json({ error: 'Error fetching current data from Aranet' });
-//     }
-
-//     const currentData1 = await current1.json();
-//     const currentData2 = await current2.json();
-//     const currentData3 = await current3.json();
-
-//     // Now fetch historical data for temperature (metric 1) from sensor 1061612
-//     const tempHistory = await fetchHistoricalData(1061612, 1);
-//     const humidityHistory = await fetchHistoricalData(1061612, 2);
-//     const co2History = await fetchHistoricalData(3147479, 3);
-//     const atmosphericPressHistory = await fetchHistoricalData(3147479, 4);
-//     const moistureHistory = await fetchHistoricalData(6305245, 8);
-//     const soilECHistory = await fetchHistoricalData(6305245, 10);
-//     const poreECHistory = await fetchHistoricalData(6305245, 11);
-    
-//     res.json({ 
-//       sensor1: currentData1, 
-//       sensor2: currentData2, 
-//       sensor3: currentData3,
-//       tempHistory: tempHistory ? tempHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
-//       humidityHistory: humidityHistory ? humidityHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
-//       co2History: co2History ? co2History.readings.slice(0, 9999) : [], // Limit to first 9999 readings
-//       atmosphericPressHistory: atmosphericPressHistory ? atmosphericPressHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
-//       moistureHistory: moistureHistory ? moistureHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
-//       soilECHistory: soilECHistory ? soilECHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
-//       poreECHistory: poreECHistory ? poreECHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
-//       lastCameraShot: cameraShot // Include the camera shot data in the response
-//     });
-//   } catch (error) {
-//     res.status(500).json({ error: 'Internal server error', detail: error.message });
-//   }
-// });
-
 app.get('/api/data', async (req, res) => {
   try {
-    // First get the current data
+    // First get the current data as before
     const [current1, current2, current3, cameraShot] = await Promise.all([
       fetch(`https://aranet.cloud/api/v1/measurements/last?sensor=1061612`, {
         headers: { 'ApiKey': ARANET_API_KEY, 'Content-Type': 'application/json' }
-      }).catch(err => {
-        console.error('Error fetching sensor 1061612:', err);
-        return { ok: false };
       }),
       fetch(`https://aranet.cloud/api/v1/measurements/last?sensor=6305245`, {
         headers: { 'ApiKey': ARANET_API_KEY, 'Content-Type': 'application/json' }
-      }).catch(err => {
-        console.error('Error fetching sensor 6305245:', err);
-        return { ok: false };
       }),
       fetch(`https://aranet.cloud/api/v1/measurements/last?sensor=3147479`, {
         headers: { 'ApiKey': ARANET_API_KEY, 'Content-Type': 'application/json' }
-      }).catch(err => {
-        console.error('Error fetching sensor 3147479:', err);
-        return { ok: false };
       }),
-      fetchLastCameraShot().catch(err => {
-        console.error('Error fetching camera shot:', err);
-        return null;
-      })
+      fetchLastCameraShot() // Get the camera shot data
     ]);
 
-    // Process sensor data with error handling
-    let currentData1 = { readings: [] };
-    let currentData2 = { readings: [] };
-    let currentData3 = { readings: [] };
-
-    if (current1.ok) {
-      try {
-        currentData1 = await current1.json();
-      } catch (err) {
-        console.error('Error parsing sensor 1061612 data:', err);
-      }
+    if (!current1.ok || !current2.ok || !current3.ok) {
+      return res.status(500).json({ error: 'Error fetching current data from Aranet' });
     }
 
-    if (current2.ok) {
-      try {
-        currentData2 = await current2.json();
-      } catch (err) {
-        console.error('Error parsing sensor 6305245 data:', err);
-      }
-    }
+    const currentData1 = await current1.json();
+    const currentData2 = await current2.json();
+    const currentData3 = await current3.json();
 
-    if (current3.ok) {
-      try {
-        currentData3 = await current3.json();
-      } catch (err) {
-        console.error('Error parsing sensor 3147479 data:', err);
-      }
-    }
-
-    // Fetch historical data with error handling
-    const historicalPromises = [
-      fetchHistoricalData(1061612, 1).catch(err => {
-        console.error('Error fetching temp history:', err);
-        return { readings: [] };
-      }),
-      fetchHistoricalData(1061612, 2).catch(err => {
-        console.error('Error fetching humidity history:', err);
-        return { readings: [] };
-      }),
-      fetchHistoricalData(3147479, 3).catch(err => {
-        console.error('Error fetching CO2 history:', err);
-        return { readings: [] };
-      }),
-      fetchHistoricalData(3147479, 4).catch(err => {
-        console.error('Error fetching atmospheric pressure history:', err);
-        return { readings: [] };
-      }),
-      fetchHistoricalData(6305245, 8).catch(err => {
-        console.error('Error fetching moisture history:', err);
-        return { readings: [] };
-      }),
-      fetchHistoricalData(6305245, 10).catch(err => {
-        console.error('Error fetching soil EC history:', err);
-        return { readings: [] };
-      }),
-      fetchHistoricalData(6305245, 11).catch(err => {
-        console.error('Error fetching pore EC history:', err);
-        return { readings: [] };
-      })
-    ];
-
-    const [
-      tempHistory,
-      humidityHistory,
-      co2History,
-      atmosphericPressHistory,
-      moistureHistory,
-      soilECHistory,
-      poreECHistory
-    ] = await Promise.all(historicalPromises);
-
+    // Now fetch historical data for temperature (metric 1) from sensor 1061612
+    const tempHistory = await fetchHistoricalData(1061612, 1);
+    const humidityHistory = await fetchHistoricalData(1061612, 2);
+    const co2History = await fetchHistoricalData(3147479, 3);
+    const atmosphericPressHistory = await fetchHistoricalData(3147479, 4);
+    const moistureHistory = await fetchHistoricalData(6305245, 8);
+    const soilECHistory = await fetchHistoricalData(6305245, 10);
+    const poreECHistory = await fetchHistoricalData(6305245, 11);
+    
     res.json({ 
       sensor1: currentData1, 
       sensor2: currentData2, 
       sensor3: currentData3,
-      tempHistory: tempHistory.readings ? tempHistory.readings.slice(0, 9999) : [],
-      humidityHistory: humidityHistory.readings ? humidityHistory.readings.slice(0, 9999) : [],
-      co2History: co2History.readings ? co2History.readings.slice(0, 9999) : [],
-      atmosphericPressHistory: atmosphericPressHistory.readings ? atmosphericPressHistory.readings.slice(0, 9999) : [],
-      moistureHistory: moistureHistory.readings ? moistureHistory.readings.slice(0, 9999) : [],
-      soilECHistory: soilECHistory.readings ? soilECHistory.readings.slice(0, 9999) : [],
-      poreECHistory: poreECHistory.readings ? poreECHistory.readings.slice(0, 9999) : [],
-      lastCameraShot: cameraShot
+      tempHistory: tempHistory ? tempHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
+      humidityHistory: humidityHistory ? humidityHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
+      co2History: co2History ? co2History.readings.slice(0, 9999) : [], // Limit to first 9999 readings
+      atmosphericPressHistory: atmosphericPressHistory ? atmosphericPressHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
+      moistureHistory: moistureHistory ? moistureHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
+      soilECHistory: soilECHistory ? soilECHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
+      poreECHistory: poreECHistory ? poreECHistory.readings.slice(0, 9999) : [], // Limit to first 9999 readings
+      lastCameraShot: cameraShot // Include the camera shot data in the response
     });
   } catch (error) {
-    console.error('Error in /api/data:', error);
-    res.status(500).json({ 
-      error: 'Internal server error', 
-      detail: error.message,
-      sensor1: { readings: [] },
-      sensor2: { readings: [] },
-      sensor3: { readings: [] },
-      tempHistory: [],
-      humidityHistory: [],
-      co2History: [],
-      atmosphericPressHistory: [],
-      moistureHistory: [],
-      soilECHistory: [],
-      poreECHistory: [],
-      lastCameraShot: null
-    });
+    res.status(500).json({ error: 'Internal server error', detail: error.message });
   }
 });
 
