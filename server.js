@@ -12,18 +12,29 @@ const SIGROW_API_KEY = process.env.SIGROW_API_KEY; // Consider moving this to en
 const WEATHER_API_KEY = process.env.WEATHER_API_KEY;
 
 // CORS configuration
-app.use(cors({
-    origin: [
-        'http://127.0.0.1:5500', 
-        'http://localhost:3000', 
-        'http://localhost:5500',
-        'https://strawberries-git-main-marks-projects-07a4f883.vercel.app',
-        'https://u-farm-lab-git-main-marks-projects-07a4f883.vercel.app',
-        'https://urban-farm-lab-twin.vercel.app/',
-        'https://simple-hauz-git-main-marks-projects-07a4f883.vercel.app'
-        // 'https://strawberries-*.vercel.app'
+const allowedOrigins = [
+    'http://127.0.0.1:5500', 
+    'http://localhost:3000', 
+    'http://localhost:5500',
+    'https://strawberries-git-main-marks-projects-07a4f883.vercel.app',
+    'https://urban-farm-lab-twin-git-main-marks-projects-07a4f883.vercel.app',
+    'https://simple-hauz-git-main-marks-projects-07a4f883.vercel.app',
+    'https://strawberries.vercel.app',
+    'https://urban-farm-lab-twin.vercel.app',
+    'https://simple-hauz.vercel.app'
+];
 
-    ],
+app.use(cors({
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        if (allowedOrigins.indexOf(origin) === -1) {
+            const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+            return callback(new Error(msg), false);
+        }
+        return callback(null, true);
+    },
     credentials: true
 }));
 
@@ -227,17 +238,6 @@ async function initDB() {
     process.exit(1);
   }
 }
-
-// Middleware
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  next();
-});
-
-
-app.use(bodyParser.json());
 
 
 // Light intensity endpoints
